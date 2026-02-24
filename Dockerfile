@@ -1,4 +1,4 @@
-FROM node:18-slim
+FROM node:20-slim
 
 # 1. Instalar Chromium y dependencias necesarias manualmente
 RUN apt-get update && apt-get install -y \
