@@ -45,6 +45,16 @@ const FIREBASE_CIP_CONFIG = {
     appId: "1:502025011637:web:9e38b7eb79686226a7d9fc"
 };
 
+const FIREBASE_CONFIG_ILC = {
+    apiKey: "AIzaSyDYSicDGQc48QLUtWHroRB30UNbATFu4c8",
+    databaseURL: "https://conocestusbrechas-d911a-default-rtdb.firebaseio.com"
+};
+
+const FIREBASE_CONFIG_OUTS = {
+    apiKey: "AIzaSyBX0_IzQWnUrdhHH-H0jMNbAp0thOVhfpU",
+    databaseURL: "https://skapdeouts-default-rtdb.firebaseio.com"
+};
+
 const userStates = new Map();
 const scheduledMessages = [];
 let availableGroups = [];
@@ -836,7 +846,10 @@ async function consultarGuardian(codigoEmpleado, mesSeleccionado, anioSelecciona
         const COLUMNA_AREA = 'Área de ocurrencia';
         const COLUMNA_SUBAREA = 'Subárea de ocurrencia';
         const COLUMNA_OBSERVADO_POR = 'Observado por';
-        const COLUMNA_PILAR_MEDIO_AMBIENTE = 'Pilar del medio ambiente'; // Columna para identificar reportes ambientales
+        const COLUMNA_ID_OBSERVADOR = 'ID del observador';
+        const COLUMNA_AREA_IMPLICADO = 'Área del implicado';
+        const COLUMNA_AREA_OBSERVADOR = 'Área del observador';
+        const COLUMNA_PILAR_MEDIO_AMBIENTE = 'Pilar del medio ambiente';
         
         const accionesInsegurasComoImplicado = todosLosRegistros.filter(reg => {
             const esAccionInsegura = reg.tipoReporte === 'accion_insegura';
@@ -846,11 +859,29 @@ async function consultarGuardian(codigoEmpleado, mesSeleccionado, anioSelecciona
         });
         
         const registrosComoObservador = todosLosRegistros.filter(reg => {
-            const idObservador = reg['ID del observador'] ? reg['ID del observador'].toString().trim() : '';
+            const idObservador = reg[COLUMNA_ID_OBSERVADOR] ? reg[COLUMNA_ID_OBSERVADOR].toString().trim() : '';
             return idObservador.includes(codigoEmpleado) || codigoEmpleado.includes(idObservador);
         });
         
-        if (registrosComoObservador.length === 0 && accionesInsegurasComoImplicado.length === 0) {
+        const accionesInsegurasSoftDrinks = todosLosRegistros.filter(reg => {
+            const esAccionInsegura = reg.tipoReporte === 'accion_insegura';
+            if (!esAccionInsegura) return false;
+            
+            const areaImplicado = reg[COLUMNA_AREA_IMPLICADO] ? reg[COLUMNA_AREA_IMPLICADO].toString().toLowerCase() : '';
+            const areaObservador = reg[COLUMNA_AREA_OBSERVADOR] ? reg[COLUMNA_AREA_OBSERVADOR].toString().toLowerCase() : '';
+            const idImplicado = reg[COLUMNA_ID_IMPLICADO] ? reg[COLUMNA_ID_IMPLICADO].toString().trim() : '';
+            const idObservador = reg[COLUMNA_ID_OBSERVADOR] ? reg[COLUMNA_ID_OBSERVADOR].toString().trim() : '';
+            
+            const esSoftDrinks = areaImplicado.includes('softdrinks') || areaObservador.includes('softdrinks');
+            const coincideCodigo = idImplicado.includes(codigoEmpleado) || 
+                                  codigoEmpleado.includes(idImplicado) ||
+                                  idObservador.includes(codigoEmpleado) || 
+                                  codigoEmpleado.includes(idObservador);
+            
+            return esSoftDrinks && coincideCodigo;
+        });
+        
+        if (registrosComoObservador.length === 0 && accionesInsegurasComoImplicado.length === 0 && accionesInsegurasSoftDrinks.length === 0) {
             return {
                 success: false,
                 mensaje: `❌ *No se encontraron registros* para el código *${codigoEmpleado}* en ${mes}/${anio}`
@@ -880,7 +911,6 @@ async function consultarGuardian(codigoEmpleado, mesSeleccionado, anioSelecciona
                 incidentesMenores++;
             }
             
-            // Verificar si es un reporte ambiental (basado en la columna Pilar del medio ambiente)
             const pilarMedioAmbiente = reg[COLUMNA_PILAR_MEDIO_AMBIENTE] || 
                                       reg['Pilar de medio ambiente'] || 
                                       reg['Pilar medio ambiente'];
@@ -949,8 +979,42 @@ async function consultarGuardian(codigoEmpleado, mesSeleccionado, anioSelecciona
         resultado += `• Reportes Ambientales: ${reportesAmbientales}\n`;
         resultado += `• Total registros: ${registrosComoObservador.length}\n\n`;
         
-        if (accionesInsegurasComoImplicado.length > 0) {
-            resultado += `⚠️ *ACCIONES INSEGURAS DONDE HAS SIDO REPORTADO COMO IMPLICADO:*\n\n`;
+        if (accionesInsegurasSoftDrinks.length > 0) {
+            resultado += `⚠️ *ACCIONES INSEGURAS EN SOFTDRINKS (donde apareces como implicado u observador):*\n\n`;
+            
+            accionesInsegurasSoftDrinks.forEach((reg, index) => {
+                const descripcion = reg[COLUMNA_DESCRIPCION] || 'Sin descripción';
+                const area = reg[COLUMNA_AREA] || 'No especificada';
+                const subarea = reg[COLUMNA_SUBAREA] || 'No especificada';
+                const observadoPor = reg[COLUMNA_OBSERVADO_POR] || 'Desconocido';
+                const areaImplicado = reg[COLUMNA_AREA_IMPLICADO] || 'No especificada';
+                const areaObservador = reg[COLUMNA_AREA_OBSERVADOR] || 'No especificada';
+                const idImplicado = reg[COLUMNA_ID_IMPLICADO] || 'No especificado';
+                const idObservador = reg[COLUMNA_ID_OBSERVADOR] || 'No especificado';
+                
+                resultado += `⚠️ *ACCIÓN INSEGURA #${index + 1}*\n`;
+                resultado += `📝 *Descripción:* ${descripcion}\n`;
+                
+                if (idImplicado.includes(codigoEmpleado) || codigoEmpleado.includes(idImplicado)) {
+                    resultado += `👤 *Rol:* IMPLICADO\n`;
+                    resultado += `📍 *Área del implicado:* ${areaImplicado}\n`;
+                }
+                if (idObservador.includes(codigoEmpleado) || codigoEmpleado.includes(idObservador)) {
+                    resultado += `👤 *Rol:* OBSERVADOR\n`;
+                    resultado += `📍 *Área del observador:* ${areaObservador}\n`;
+                }
+                
+                resultado += `📍 *Área de ocurrencia:* ${area}\n`;
+                resultado += `📍 *Subárea:* ${subarea}\n`;
+                resultado += `👤 *Reportado por:* ${observadoPor}\n`;
+                resultado += `─────────────────────\n\n`;
+            });
+            
+            resultado += `📊 *TOTAL DE ACCIONES INSEGURAS EN SOFTDRINKS:* ${accionesInsegurasSoftDrinks.length}\n\n`;
+        }
+        
+        if (accionesInsegurasComoImplicado.length > 0 && accionesInsegurasSoftDrinks.length === 0) {
+            resultado += `⚠️ *ACCIONES INSEGURAS DONDE HAS SIDO REPORTADO COMO IMPLICADO (fuera de SoftDrinks):*\n\n`;
             
             accionesInsegurasComoImplicado.forEach((reg, index) => {
                 const descripcion = reg[COLUMNA_DESCRIPCION] || 'Sin descripción';
@@ -967,8 +1031,8 @@ async function consultarGuardian(codigoEmpleado, mesSeleccionado, anioSelecciona
             });
             
             resultado += `📊 *TOTAL DE ACCIONES INSEGURAS COMO IMPLICADO:* ${accionesInsegurasComoImplicado.length}\n\n`;
-        } else {
-            resultado += `✅ *¡FELICIDADES!* No tienes acciones inseguras reportadas como implicado en este período.\n\n`;
+        } else if (accionesInsegurasComoImplicado.length === 0 && accionesInsegurasSoftDrinks.length === 0) {
+            resultado += `✅ *¡FELICIDADES!* No tienes acciones inseguras reportadas en este período.\n\n`;
         }
         
         resultado += `⏰ *Consulta:* ${moment().tz(TIMEZONE).format('DD/MM/YYYY HH:mm')}\n`;
@@ -986,7 +1050,8 @@ async function consultarGuardian(codigoEmpleado, mesSeleccionado, anioSelecciona
                 incidentesMenores,
                 reportesAmbientales,
                 totalObservador: registrosComoObservador.length,
-                totalAccionesImplicado: accionesInsegurasComoImplicado.length
+                totalAccionesImplicado: accionesInsegurasComoImplicado.length,
+                totalAccionesSoftDrinks: accionesInsegurasSoftDrinks.length
             }
         };
         
@@ -1030,7 +1095,8 @@ async function manejarGuardian(message, userId) {
         `• 76009949\n\n` +
         `*📝 IMPORTANTE:*\n` +
         `Puedes buscar con el código completo o cualquier parte que coincida.\n` +
-        `El sistema buscará tanto reportes que hayas hecho como acciones inseguras donde apareces como implicado.\n\n` +
+        `El sistema buscará tanto reportes que hayas hecho como acciones inseguras donde apareces como implicado, ` +
+        `con especial atención a las áreas de SoftDrinks (tanto como implicado u observador).\n\n` +
         `Envía tu código ahora o escribe *cancelar* para regresar al menú.`
     );
 }
@@ -1820,16 +1886,6 @@ async function obtenerSemaforoTerritorio() {
         return mensajeError;
     }
 }
-
-const FIREBASE_CONFIG_ILC = {
-    apiKey: "AIzaSyDYSicDGQc48QLUtWHroRB30UNbATFu4c8",
-    databaseURL: "https://conocestusbrechas-d911a-default-rtdb.firebaseio.com"
-};
-
-const FIREBASE_CONFIG_OUTS = {
-    apiKey: "AIzaSyBX0_IzQWnUrdhHH-H0jMNbAp0thOVhfpU",
-    databaseURL: "https://skapdeouts-default-rtdb.firebaseio.com"
-};
 
 function esNoAplica(respuesta) {
     if (!respuesta) return false;
