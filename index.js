@@ -62,7 +62,7 @@ let availableGroups = [];
 
 const TANQUES_LIST = [
     'TQ 1', 'TQ 2', 'TQ 3', 'TQ 4', 'TQ 5', 'TQ 6', 'TQ 7', 'TQ 8', 'TQ 9', 'TQ 10',
-    'TQ 11', 'TQ 12', 'TQ 13', 'TQ 14', 'TQ 15', 'TQ 16', 'TQ 17', 'TQ 400'
+    'TQ 11', 'TQ 12', 'TQ 13', 'TQ 14', 'TQ 15', 'TQ 16', 'TQ 400'
 ];
 
 const MESES = [
@@ -76,8 +76,9 @@ const client = new Client({
         dataPath: path.join(__dirname, 'whatsapp-session')
     }),
     puppeteer: {
-        headless: "new",
+        headless: true, 
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+        dumpio: true,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -85,13 +86,14 @@ const client = new Client({
             '--disable-accelerated-2d-canvas',
             '--no-first-run',
             '--no-zygote',
-            '--disable-gpu'
+            '--disable-gpu',
+            '--single-process',
+            '--disable-software-rasterizer',
+            '--mute-audio',
+            '--disable-extensions'
         ]
-    },
-    webVersionCache: {
-        type: "remote",
-        remotePath: "https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html"
     }
+    
 });
 
 function crearCarpetas() {
@@ -540,72 +542,6 @@ async function generarPDF(registros, tanque, tipoBusqueda, filtros) {
     });
 }
 
-// ============================================
-// FUNCIONES PARA CADA OPCIÓN DEL MENÚ (FLUJOS SECUENCIALES)
-// ============================================
-
-// --- OPCIÓN 1: ACADIA (Solo enlace) ---
-async function manejarAcadia(message) {
-    await message.reply(`🔗 *Enlace para Acadia:*\nhttps://ab-inbev.acadia.sysalli.com/documents?filter=lang-eql:es-mx&page=1&pagesize=50\n\n*Nota:* Haz click en el enlace para poder entrar.`);
-    // No se envía menú automáticamente
-}
-
-// --- OPCIÓN 2: GUARDIAN (Flujo secuencial: código → año → mes → resultado) ---
-async function manejarGuardian(message, userId) {
-    userStates.set(userId, { 
-        estado: 'guardian_esperando_codigo',
-        datos: {}
-    });
-    
-    await message.reply(
-        `🛡️ *GUARDIAN - SISTEMA DE REPORTES*\n\n` +
-        `Para consultar tus reportes, necesito tu código de empleado.\n\n` +
-        `*Ejemplos:*\n` +
-        `• 76001111\n` +
-        `• 1111\n` +
-        `• 76009949\n\n` +
-        `*📝 IMPORTANTE:*\n` +
-        `Puedes buscar con el código completo o cualquier parte que coincida.\n` +
-        `El sistema buscará tanto reportes que hayas hecho como acciones inseguras donde apareces como implicado.\n\n` +
-        `Envía tu código ahora o escribe *cancelar* para regresar al menú.`
-    );
-}
-
-// --- OPCIÓN 3: CHECKLIST DE SEGURIDAD (Flujo secuencial) ---
-async function manejarChecklistSeguridad(message, userId) {
-    userStates.set(userId, { 
-        estado: 'checklist_menu_principal',
-        datos: {}
-    });
-    
-    const menuOpciones = `✅ *CHECKLIST DE SEGURIDAD*\n\n¿Qué deseas verificar?\n\n1️⃣ - Grupos\n2️⃣ - Técnicos\n\n*Envía el número de la opción (1-2)*\nO envía *cancelar* para regresar al menú principal.`;
-    
-    await message.reply(menuOpciones);
-}
-
-// --- OPCIÓN 4: SEMÁFORO DE TERRITORIO (Consulta directa, sin menú automático) ---
-async function manejarSemaforoTerritorio(message) {
-    await message.reply("⏳ Consultando semáforo de territorio...");
-    const resultado = await obtenerSemaforoTerritorio();
-    await message.reply(resultado);
-    // No se envía menú automáticamente
-}
-
-// --- OPCIÓN 5: RECLAMOS DE CALIDAD (Consulta directa, sin menú automático) ---
-async function manejarReclamosCalidad(message) {
-    await message.reply("🔍 Consultando reclamos de calidad...");
-    const resultado = await consultarReclamosCalidad();
-    await message.reply(resultado.mensaje);
-    // No se envía menú automáticamente
-}
-
-// --- OPCIÓN 6: ENERGÍA (Solo enlace) ---
-async function manejarEnergia(message) {
-    await message.reply(`🔗 *Enlace para Energía:*\nhttps://energia2-7e868.web.app/\n\n*Nota:* Haz click en el enlace para poder entrar.`);
-    // No se envía menú automáticamente
-}
-
-// --- OPCIÓN 7: CIP JARABE TERMINADO (Flujo secuencial completo) ---
 async function manejarCIPJarabeTerminado(message, userId) {
     userStates.set(userId, { 
         estado: 'cip_esperando_tanque',
@@ -626,311 +562,7 @@ async function manejarCIPJarabeTerminado(message, userId) {
     await message.reply(menuTanques);
 }
 
-// --- OPCIÓN 8: CIP JARABE SIMPLE (Solo enlace) ---
-async function manejarCIPJarabeSimple(message) {
-    await message.reply(`🔗 *Enlace para CIP Jarabe Simple:*\nhttps://cip-jarabesimple.web.app/\n\n*Nota:* Haz click en el enlace para poder entrar.`);
-    // No se envía menú automáticamente
-}
-
-// --- OPCIÓN 9: PROGRAMAR MENSAJES (Flujo secuencial) ---
-async function manejarProgramarMensajes(message, userId) {
-    if (scheduledMessages.length > 0) {
-        let mensajeOpciones = "📅 *MENSAJES PROGRAMADOS EXISTENTES*\n\n";
-        
-        scheduledMessages.forEach((msg, index) => {
-            mensajeOpciones += `${index + 1}. Horas: ${msg.horas.join(', ')} - Creado: ${moment(msg.fechaCreacion).tz(TIMEZONE).format('DD/MM/YYYY')}\n`;
-        });
-        
-        mensajeOpciones += "\n*Selecciona una opción:*\n\n";
-        mensajeOpciones += "1️⃣ - Editar mensaje actual\n";
-        mensajeOpciones += "2️⃣ - Crear nuevo registro con horas diferentes\n";
-        mensajeOpciones += "3️⃣ - Eliminar mensaje programado\n";
-        mensajeOpciones += "4️⃣ - Cancelar\n\n";
-        mensajeOpciones += "Envía el número de la opción (1-4)";
-        
-        await message.reply(mensajeOpciones);
-        userStates.set(userId, { estado: 'seleccionar_opcion_existente', datos: {} });
-    } else {
-        await iniciarNuevaProgramacion(message);
-    }
-}
-
-// --- OPCIÓN 10: SKAP (Flujo secuencial: elegir tipo → código → resultado) ---
-async function manejarSKAP(message, userId) {
-    userStates.set(userId, { estado: 'seleccionar_tipo_skap', datos: {} });
-    
-    await message.reply(
-        "📋 *SISTEMA SKAP*\n\n" +
-        "Elige el tipo de consulta:\n\n" +
-        "1️⃣ - *ILC*\n" +
-        "2️⃣ - *OUTS*\n\n" +
-        "Envía el número de la opción (1-2)\n" +
-        "O envía *cancelar* para regresar al menú principal."
-    );
-}
-
-// ============================================
-// FUNCIONES AUXILIARES PARA CADA FLUJO
-// ============================================
-
-// --- Funciones para Guardian (Opción 2) ---
-async function procesarCodigoGuardian(message, userId, estadoUsuario) {
-    const codigo = message.body.trim();
-    
-    if (!codigo || codigo === '') {
-        await message.reply("❌ Por favor ingresa un código válido.");
-        return;
-    }
-    
-    estadoUsuario.datos.codigo = codigo;
-    estadoUsuario.estado = 'guardian_esperando_anio';
-    userStates.set(userId, estadoUsuario);
-    
-    const añoActual = moment().tz(TIMEZONE).year();
-    const años = [añoActual, añoActual - 1, añoActual - 2];
-    
-    let menuAños = `📅 *SELECCIONA EL AÑO*\n\n`;
-    años.forEach((año, index) => {
-        menuAños += `${numeroConEmoji(index + 1)} - ${año}\n`;
-    });
-    
-    menuAños += `\n*Envía el número del año*\nO envía *cancelar* para regresar.`;
-    
-    await message.reply(menuAños);
-}
-
-async function procesarAnioGuardian(message, userId, estadoUsuario) {
-    const opcion = parseInt(message.body.trim());
-    
-    if (isNaN(opcion) || opcion < 1 || opcion > 3) {
-        await message.reply("❌ Opción inválida. Por favor envía un número del 1 al 3.");
-        return;
-    }
-    
-    const añoActual = moment().tz(TIMEZONE).year();
-    const años = [añoActual, añoActual - 1, añoActual - 2];
-    const añoSeleccionado = años[opcion - 1];
-    
-    estadoUsuario.datos.anio = añoSeleccionado;
-    estadoUsuario.estado = 'guardian_esperando_mes';
-    userStates.set(userId, estadoUsuario);
-    
-    let menuMeses = `📅 *SELECCIONA EL MES*\n\n`;
-    MESES.forEach((mes, index) => {
-        menuMeses += `${numeroConEmoji(index + 1)} - ${mes}\n`;
-    });
-    
-    menuMeses += `\n*Envía el número del mes (1-12)*\nO envía *cancelar* para regresar.`;
-    
-    await message.reply(menuMeses);
-}
-
-async function procesarMesGuardian(message, userId, estadoUsuario) {
-    const mes = parseInt(message.body.trim());
-    
-    if (isNaN(mes) || mes < 1 || mes > 12) {
-        await message.reply("❌ Opción inválida. Por favor envía un número del 1 al 12.");
-        return;
-    }
-    
-    await message.reply("🔍 Consultando Guardian...");
-    
-    const resultado = await consultarGuardian(
-        estadoUsuario.datos.codigo,
-        mes,
-        estadoUsuario.datos.anio
-    );
-    
-    await message.reply(resultado.mensaje);
-    
-    // Limpiar el estado pero NO enviar menú automáticamente
-    userStates.delete(userId);
-}
-
-// --- Funciones para Checklist (Opción 3) ---
-async function procesarChecklistMenuPrincipal(message, userId, estadoUsuario) {
-    const texto = message.body.trim();
-    
-    if (texto === '1') {
-        await obtenerGruposDisponibles(message, userId);
-    } else if (texto === '2') {
-        await obtenerInfoTecnico(message, userId);
-    } else {
-        await message.reply("❌ Opción inválida. Por favor envía 1 para Grupos o 2 para Técnicos.");
-    }
-}
-
-async function obtenerGruposDisponibles(message, userId) {
-    try {
-        console.log('🔍 Consultando grupos desde Dashboard de seguridad...');
-        
-        const response = await axios.get(`${FIREBASE_CONFIG.databaseURL}/registros.json`, {
-            timeout: 15000
-        });
-        
-        const usuarios = response.data || {};
-        const gruposUnicos = new Set();
-        
-        Object.values(usuarios).forEach(usuario => {
-            if (usuario.grupo) {
-                gruposUnicos.add(usuario.grupo);
-            }
-        });
-        
-        const grupos = gruposUnicos.size > 0 ? Array.from(gruposUnicos) : GRUPOS_DISPONIBLES;
-        
-        let menuGrupos = `👥 *GRUPOS DISPONIBLES*\n\n`;
-        grupos.forEach((grupo, index) => {
-            menuGrupos += `${numeroConEmoji(index + 1)} - ${grupo}\n`;
-        });
-        
-        menuGrupos += `\n*Selecciona el número del grupo que deseas consultar*\nO envía *cancelar* para regresar.`;
-        
-        await message.reply(menuGrupos);
-        
-        userStates.set(userId, { 
-            estado: 'checklist_esperando_grupo',
-            datos: { grupos: grupos }
-        });
-        
-    } catch (error) {
-        console.error("Error al obtener grupos:", error);
-        
-        let menuGrupos = `👥 *GRUPOS DISPONIBLES*\n\n`;
-        GRUPOS_DISPONIBLES.forEach((grupo, index) => {
-            menuGrupos += `${numeroConEmoji(index + 1)} - ${grupo}\n`;
-        });
-        
-        menuGrupos += `\n*Selecciona el número del grupo que deseas consultar*\nO envía *cancelar* para regresar.`;
-        
-        await message.reply(menuGrupos);
-        
-        userStates.set(userId, { 
-            estado: 'checklist_esperando_grupo',
-            datos: { grupos: GRUPOS_DISPONIBLES }
-        });
-    }
-}
-
-async function obtenerInfoTecnico(message, userId) {
-    await message.reply(
-        `👤 *CONSULTAR TÉCNICO*\n\n` +
-        `Por favor, ingresa el *código del técnico* que deseas consultar.\n\n` +
-        `*Ejemplos:*\n` +
-        `• 12345\n` +
-        `• 76001111\n` +
-        `• 1111\n\n` +
-        `O envía *cancelar* para regresar.`
-    );
-    
-    userStates.set(userId, { 
-        estado: 'checklist_esperando_codigo_tecnico',
-        datos: {}
-    });
-}
-
-// --- Funciones para SKAP (Opción 10) ---
-async function procesarSeleccionTipoSkap(message, userId, estadoUsuario) {
-    const texto = message.body.trim();
-    
-    if (texto === '1') {
-        await manejarSkapILC(message, userId);
-    } else if (texto === '2') {
-        await manejarSkapOUTS(message, userId);
-    } else {
-        await message.reply("❌ Opción inválida. Por favor envía 1 para ILC o 2 para OUTS.");
-    }
-}
-
-async function manejarSkapILC(message, userId) {
-    userStates.set(userId, { 
-        estado: 'esperando_codigo_skap_ilc',
-        datos: {}
-    });
-    
-    await message.reply(
-        "📋 *CONSULTA SKAP - ILC*\n\n" +
-        "Para poder revisar tus notas de SKAP, envía tu código de empleado a continuación:\n\n" +
-        "*Ejemplos de códigos ILC:*\n" +
-        "• 76001111 (código completo)\n" +
-        "• 1111 (parte del código)\n" +
-        "• 7601260\n" +
-        "• 1260\n" +
-        "• 76011111\n" +
-        "• 11111\n\n" +
-        "*📝 IMPORTANTE:*\n" +
-        "Puedes buscar con el código completo o cualquier parte que coincida.\n" +
-        "El sistema busca en todos los campos posibles.\n\n" +
-        "O envía *cancelar* para regresar al menú."
-    );
-}
-
-async function manejarSkapOUTS(message, userId) {
-    userStates.set(userId, { 
-        estado: 'esperando_codigo_skap_outs',
-        datos: {}
-    });
-    
-    await message.reply(
-        "📋 *CONSULTA SKAP - OUTS*\n\n" +
-        "Para poder revisar tu licencia para operar, envía tu código de empleado a continuación:\n\n" +
-        "*Ejemplos de códigos OUTS:*\n" +
-        "• 11111111 (código completo)\n" +
-        "• 1111 (parte del código)\n" +
-        "• 1111\n" +
-        "• 11111\n" +
-        "• 1111\n\n" +
-        "*📝 IMPORTANTE:*\n" +
-        "Puedes buscar con el código completo o cualquier parte que coincida.\n" +
-        "El sistema busca en todos los campos posibles.\n\n" +
-        "O envía *cancelar* para regresar al menú."
-    );
-}
-
-async function procesarCodigoSkapILC(message, userId, estadoUsuario) {
-    const codigoEmpleado = message.body.trim();
-    
-    if (!codigoEmpleado || codigoEmpleado === '') {
-        await message.reply("❌ Por favor ingresa un código válido.");
-        return;
-    }
-    
-    await message.reply("🔍 Buscando información de SKAP ILC...");
-    
-    try {
-        const resultado = await buscarSkapILC(codigoEmpleado);
-        await message.reply(resultado);
-    } catch (error) {
-        console.error("Error en búsqueda ILC:", error.message);
-        await message.reply("❌ Error en la búsqueda. Intenta nuevamente.");
-    }
-    
-    userStates.delete(userId);
-}
-
-async function procesarCodigoSkapOUTS(message, userId, estadoUsuario) {
-    const codigoEmpleado = message.body.trim();
-    
-    if (!codigoEmpleado || codigoEmpleado === '') {
-        await message.reply("❌ Por favor ingresa un código válido.");
-        return;
-    }
-    
-    await message.reply("🔍 Buscando información de SKAP OUTS...");
-    
-    try {
-        const resultado = await buscarSkapOUTS(codigoEmpleado);
-        await message.reply(resultado);
-    } catch (error) {
-        console.error("Error en búsqueda OUTS:", error.message);
-        await message.reply("❌ Error en la búsqueda. Intenta nuevamente.");
-    }
-    
-    userStates.delete(userId);
-}
-
-// --- Funciones para CIP (Opción 7) ---
-async function procesarSeleccionTanqueCIP(message, userId, estadoUsuario) {
+async function manejarSeleccionTanque(message, userId, estadoUsuario) {
     const opcion = parseInt(message.body.trim());
     
     if (isNaN(opcion) || opcion < 1 || opcion > TANQUES_LIST.length + 1) {
@@ -958,7 +590,7 @@ async function procesarSeleccionTanqueCIP(message, userId, estadoUsuario) {
     );
 }
 
-async function procesarTipoBusquedaCIP(message, userId, estadoUsuario) {
+async function manejarTipoBusqueda(message, userId, estadoUsuario) {
     const opcion = message.body.trim();
     
     if (opcion === '1') {
@@ -993,7 +625,7 @@ async function procesarTipoBusquedaCIP(message, userId, estadoUsuario) {
     }
 }
 
-async function procesarRangoFechasCIP(message, userId, estadoUsuario) {
+async function manejarRangoFechas(message, userId, estadoUsuario) {
     const texto = message.body.trim().toLowerCase();
     
     const patron = /(\d{1,2})-(\d{1,2})-(\d{4})\s+(?:hasta|a)\s+(\d{1,2})-(\d{1,2})-(\d{4})/i;
@@ -1038,7 +670,7 @@ async function procesarRangoFechasCIP(message, userId, estadoUsuario) {
     );
 }
 
-async function procesarSeleccionMesCIP(message, userId, estadoUsuario) {
+async function manejarSeleccionMes(message, userId, estadoUsuario) {
     const mes = parseInt(message.body.trim());
     
     if (isNaN(mes) || mes < 1 || mes > 12) {
@@ -1062,7 +694,7 @@ async function procesarSeleccionMesCIP(message, userId, estadoUsuario) {
     await message.reply(menuAños);
 }
 
-async function procesarSeleccionAnioCIP(message, userId, estadoUsuario) {
+async function manejarSeleccionAnio(message, userId, estadoUsuario) {
     const opcion = parseInt(message.body.trim());
     
     if (isNaN(opcion) || opcion < 1 || opcion > 3) {
@@ -1087,7 +719,7 @@ async function procesarSeleccionAnioCIP(message, userId, estadoUsuario) {
     );
 }
 
-async function procesarFormatoDescargaCIP(message, userId, estadoUsuario) {
+async function manejarFormatoDescarga(message, userId, estadoUsuario) {
     const opcion = message.body.trim();
     
     if (opcion !== '1' && opcion !== '2') {
@@ -1116,6 +748,7 @@ async function procesarFormatoDescargaCIP(message, userId, estadoUsuario) {
             "• El mes y año"
         );
         userStates.delete(userId);
+        await enviarMenu(message);
         return;
     }
     
@@ -1152,11 +785,30 @@ async function procesarFormatoDescargaCIP(message, userId, estadoUsuario) {
     }
     
     userStates.delete(userId);
+    await enviarMenu(message);
 }
 
-// ============================================
-// FUNCIONES DE CONSULTA A BASES DE DATOS
-// ============================================
+function base64ToArrayBuffer(base64) {
+    const binaryString = Buffer.from(base64, 'base64').toString('binary');
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes;
+}
+
+async function procesarExcelDesdeBase64(base64) {
+    try {
+        const buffer = Buffer.from(base64, 'base64');
+        const workbook = XLSX.read(buffer, { type: 'buffer' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const datos = XLSX.utils.sheet_to_json(sheet);
+        return datos;
+    } catch (error) {
+        console.error("Error al procesar Excel:", error);
+        return [];
+    }
+}
 
 async function consultarGuardian(codigoEmpleado, mesSeleccionado, anioSeleccionado) {
     try {
@@ -1432,26 +1084,25 @@ async function consultarGuardian(codigoEmpleado, mesSeleccionado, anioSelecciona
     }
 }
 
-function base64ToArrayBuffer(base64) {
-    const binaryString = Buffer.from(base64, 'base64').toString('binary');
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes;
-}
-
-async function procesarExcelDesdeBase64(base64) {
-    try {
-        const buffer = Buffer.from(base64, 'base64');
-        const workbook = XLSX.read(buffer, { type: 'buffer' });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const datos = XLSX.utils.sheet_to_json(sheet);
-        return datos;
-    } catch (error) {
-        console.error("Error al procesar Excel:", error);
-        return [];
-    }
+async function manejarGuardian(message, userId) {
+    userStates.set(userId, { 
+        estado: 'guardian_esperando_codigo',
+        datos: {}
+    });
+    
+    await message.reply(
+        `🛡️ *GUARDIAN - SISTEMA DE REPORTES*\n\n` +
+        `Para consultar tus reportes, necesito tu código de empleado.\n\n` +
+        `*Ejemplos:*\n` +
+        `• 76001111\n` +
+        `• 1111\n` +
+        `• 76009949\n\n` +
+        `*📝 IMPORTANTE:*\n` +
+        `Puedes buscar con el código completo o cualquier parte que coincida.\n` +
+        `El sistema buscará tanto reportes que hayas hecho como acciones inseguras donde apareces como implicado, ` +
+        `con especial atención a las áreas de SoftDrinks (tanto como implicado u observador).\n\n` +
+        `Envía tu código ahora o escribe *cancelar* para regresar al menú.`
+    );
 }
 
 async function consultarReclamosCalidad() {
@@ -1577,6 +1228,471 @@ async function consultarReclamosCalidad() {
             error: error.message,
             mensaje: mensajeError
         };
+    }
+}
+
+async function obtenerChecklistSeguridad(message, userId) {
+    const menuOpciones = `✅ *CHECKLIST DE SEGURIDAD*\n\n¿Qué deseas verificar?\n\n1️⃣ - Grupos\n2️⃣ - Técnicos\n\n*Envía el número de la opción (1-2)*\nO envía *cancelar* para regresar al menú principal.`;
+    
+    await message.reply(menuOpciones);
+    userStates.set(userId, { 
+        estado: 'checklist_menu_principal',
+        datos: {}
+    });
+}
+
+async function obtenerGruposDisponibles(message, userId) {
+    try {
+        console.log('🔍 Consultando grupos desde Dashboard de seguridad...');
+        
+        const response = await axios.get(`${FIREBASE_CONFIG.databaseURL}/registros.json`, {
+            timeout: 15000
+        });
+        
+        const usuarios = response.data || {};
+        const gruposUnicos = new Set();
+        
+        Object.values(usuarios).forEach(usuario => {
+            if (usuario.grupo) {
+                gruposUnicos.add(usuario.grupo);
+            }
+        });
+        
+        const grupos = gruposUnicos.size > 0 ? Array.from(gruposUnicos) : GRUPOS_DISPONIBLES;
+        
+        let menuGrupos = `👥 *GRUPOS DISPONIBLES*\n\n`;
+        grupos.forEach((grupo, index) => {
+            menuGrupos += `${numeroConEmoji(index + 1)} - ${grupo}\n`;
+        });
+        
+        menuGrupos += `\n*Selecciona el número del grupo que deseas consultar*\nO envía *cancelar* para regresar.`;
+        
+        await message.reply(menuGrupos);
+        
+        userStates.set(userId, { 
+            estado: 'checklist_esperando_grupo',
+            datos: { grupos: grupos }
+        });
+        
+    } catch (error) {
+        console.error("Error al obtener grupos:", error);
+        
+        let menuGrupos = `👥 *GRUPOS DISPONIBLES*\n\n`;
+        GRUPOS_DISPONIBLES.forEach((grupo, index) => {
+            menuGrupos += `${numeroConEmoji(index + 1)} - ${grupo}\n`;
+        });
+        
+        menuGrupos += `\n*Selecciona el número del grupo que deseas consultar*\nO envía *cancelar* para regresar.`;
+        
+        await message.reply(menuGrupos);
+        
+        userStates.set(userId, { 
+            estado: 'checklist_esperando_grupo',
+            datos: { grupos: GRUPOS_DISPONIBLES }
+        });
+    }
+}
+
+async function obtenerAnosDisponibles(message, userId, tipo, identificador) {
+    try {
+        let anosSet = new Set();
+        const añoActual = moment().tz(TIMEZONE).year();
+        
+        anosSet.add(añoActual);
+        anosSet.add(añoActual - 1);
+        
+        const reportesResponse = await axios.get(`${FIREBASE_CONFIG.databaseURL}/reportes_seguridad.json`, {
+            timeout: 15000
+        });
+        const reportes = reportesResponse.data || {};
+        
+        Object.values(reportes).forEach(report => {
+            if (report.fecha) {
+                const añoReporte = moment(report.fecha).year();
+                if (añoReporte >= 2020) {
+                    anosSet.add(añoReporte);
+                }
+            }
+        });
+        
+        const anos = Array.from(anosSet).sort((a, b) => b - a);
+        
+        let menuAnos = `📅 *SELECCIONA EL AÑO*\n\n`;
+        if (tipo === 'grupo') {
+            menuAnos += `Grupo: *${identificador}*\n\n`;
+        } else {
+            menuAnos += `Técnico: *${identificador}*\n\n`;
+        }
+        
+        anos.forEach((ano, index) => {
+            menuAnos += `${numeroConEmoji(index + 1)} - ${ano}\n`;
+        });
+        
+        menuAnos += `\n*Envía el número del año*\nO envía *cancelar* para regresar.`;
+        
+        await message.reply(menuAnos);
+        
+        userStates.set(userId, { 
+            estado: tipo === 'grupo' ? 'checklist_esperando_ano_grupo' : 'checklist_esperando_ano_tecnico',
+            datos: { 
+                [tipo]: identificador,
+                anos: anos,
+                tecnicoInfo: userId 
+            }
+        });
+        
+    } catch (error) {
+        console.error("Error al obtener años:", error);
+        await message.reply("❌ Error al consultar años disponibles. Usando año actual.");
+        
+        if (tipo === 'grupo') {
+            await obtenerMesesGrupo(message, userId, identificador, moment().tz(TIMEZONE).year());
+        } else {
+            await obtenerMesesTecnico(message, userId, identificador, moment().tz(TIMEZONE).year());
+        }
+    }
+}
+
+async function obtenerMesesGrupo(message, userId, grupoSeleccionado, añoSeleccionado) {
+    let menuMeses = `📅 *SELECCIONA EL MES*\n\nGrupo: *${grupoSeleccionado}*\nAño: *${añoSeleccionado}*\n\n`;
+    
+    for (let i = 0; i < MESES.length; i++) {
+        menuMeses += `${numeroConEmoji(i + 1)} - ${MESES[i]}\n`;
+    }
+    
+    menuMeses += `\n*Envía el número del mes (1-12)*\nO envía *cancelar* para regresar.`;
+    
+    await message.reply(menuMeses);
+    
+    userStates.set(userId, { 
+        estado: 'checklist_esperando_mes_grupo',
+        datos: { grupo: grupoSeleccionado, año: añoSeleccionado }
+    });
+}
+
+async function obtenerResultadosGrupo(message, userId, grupo, añoSeleccionado, mesSeleccionado) {
+    try {
+        await message.reply(`🔍 Buscando resultados para *${grupo}* de *${MESES[mesSeleccionado - 1]} ${añoSeleccionado}*...`);
+        
+        const fechaInicio = moment().tz(TIMEZONE).year(añoSeleccionado).month(mesSeleccionado - 1).startOf('month');
+        const fechaFin = moment().tz(TIMEZONE).year(añoSeleccionado).month(mesSeleccionado - 1).endOf('month');
+        
+        console.log(`Consultando reportes desde ${fechaInicio.format('YYYY-MM-DD')} hasta ${fechaFin.format('YYYY-MM-DD')}`);
+        
+        const usuariosResponse = await axios.get(`${FIREBASE_CONFIG.databaseURL}/registros.json`, {
+            timeout: 15000
+        });
+        const usuarios = usuariosResponse.data || {};
+        
+        const reportesResponse = await axios.get(`${FIREBASE_CONFIG.databaseURL}/reportes_seguridad.json`, {
+            timeout: 15000
+        });
+        const reportes = reportesResponse.data || {};
+        
+        const usuariosGrupo = [];
+        Object.entries(usuarios).forEach(([userId, usuario]) => {
+            if (usuario.grupo === grupo) {
+                const nombreCompleto = `${usuario.nombres || ''} ${usuario.apellidos || ''}`.trim();
+                usuariosGrupo.push({
+                    id: userId,
+                    nombre: nombreCompleto || 'Sin nombre',
+                    codigo: usuario.codigo || 'Sin código',
+                    grupo: usuario.grupo
+                });
+            }
+        });
+        
+        const reportesFiltrados = [];
+        Object.values(reportes).forEach(report => {
+            if (report.fecha && report.grupo_usuario === grupo) {
+                const fechaReporte = moment(report.fecha);
+                if (fechaReporte.isBetween(fechaInicio, fechaFin, null, '[]')) {
+                    reportesFiltrados.push(report);
+                }
+            }
+        });
+        
+        const estadisticasTecnicos = {};
+        
+        usuariosGrupo.forEach(usuario => {
+            estadisticasTecnicos[usuario.nombre] = {
+                nombre: usuario.nombre,
+                codigo: usuario.codigo,
+                diario: 0,
+                semanal: 0,
+                mensual: 0,
+                total: 0
+            };
+        });
+        
+        reportesFiltrados.forEach(report => {
+            const tecnico = report.usuario;
+            if (estadisticasTecnicos[tecnico]) {
+                if (report.seguimiento === 'diario') {
+                    estadisticasTecnicos[tecnico].diario++;
+                } else if (report.seguimiento === 'semanal') {
+                    estadisticasTecnicos[tecnico].semanal++;
+                } else if (report.seguimiento === 'mensual') {
+                    estadisticasTecnicos[tecnico].mensual++;
+                }
+                estadisticasTecnicos[tecnico].total++;
+            }
+        });
+        
+        const totalTecnicos = usuariosGrupo.length;
+        const totalDiario = Object.values(estadisticasTecnicos).reduce((sum, t) => sum + t.diario, 0);
+        const totalSemanal = Object.values(estadisticasTecnicos).reduce((sum, t) => sum + t.semanal, 0);
+        const totalMensual = Object.values(estadisticasTecnicos).reduce((sum, t) => sum + t.mensual, 0);
+        
+        const maxDiario = 20 * totalTecnicos;
+        const maxSemanal = 4 * totalTecnicos;
+        const maxMensual = 1 * totalTecnicos;
+        
+        const porcentajeDiario = maxDiario > 0 ? Math.min(Math.round((totalDiario / maxDiario) * 100), 100) : 0;
+        const porcentajeSemanal = maxSemanal > 0 ? Math.min(Math.round((totalSemanal / maxSemanal) * 100), 100) : 0;
+        const porcentajeMensual = maxMensual > 0 ? Math.min(Math.round((totalMensual / maxMensual) * 100), 100) : 0;
+        
+        let resultado = `📊 *RESULTADOS CHECKLIST DE SEGURIDAD*\n\n`;
+        resultado += `👥 *Grupo:* ${grupo}\n`;
+        resultado += `📅 *Período:* ${MESES[mesSeleccionado - 1]} ${añoSeleccionado}\n`;
+        resultado += `👤 *Total técnicos:* ${totalTecnicos}\n`;
+        resultado += `📋 *Total reportes:* ${reportesFiltrados.length}\n\n`;
+        
+        resultado += `📈 *ESTADÍSTICAS GENERALES:*\n`;
+        resultado += `• Diarios: ${totalDiario}/${maxDiario} (${porcentajeDiario}%)\n`;
+        resultado += `• Semanales: ${totalSemanal}/${maxSemanal} (${porcentajeSemanal}%)\n`;
+        resultado += `• Mensuales: ${totalMensual}/${maxMensual} (${porcentajeMensual}%)\n\n`;
+        
+        resultado += `📋 *DETALLE POR TÉCNICO:*\n\n`;
+        
+        const tecnicosOrdenados = Object.values(estadisticasTecnicos).sort((a, b) => b.total - a.total);
+        
+        tecnicosOrdenados.forEach(tecnico => {
+            if (tecnico.nombre && tecnico.nombre !== 'Sin nombre') {
+                const porcentajePromedio = 3 > 0 ? Math.round((tecnico.diario/20 + tecnico.semanal/4 + tecnico.mensual/1) / 3 * 100) : 0;
+                
+                resultado += `👤 *${tecnico.nombre}* (${tecnico.codigo})\n`;
+                resultado += `   📅 Diario: ${tecnico.diario}/20 (${Math.min(Math.round(tecnico.diario/20*100), 100)}%)\n`;
+                resultado += `   📅 Semanal: ${tecnico.semanal}/4 (${Math.min(Math.round(tecnico.semanal/4*100), 100)}%)\n`;
+                resultado += `   📅 Mensual: ${tecnico.mensual}/1 (${Math.min(Math.round(tecnico.mensual/1*100), 100)}%)\n`;
+                resultado += `   📊 Promedio: ${porcentajePromedio}%\n\n`;
+            }
+        });
+        
+        resultado += `⏰ *Consulta:* ${moment().tz(TIMEZONE).format('DD/MM/YYYY HH:mm')}\n`;
+        resultado += `🔗 *Fuente:* Dashboard de seguridad territorial`;
+        
+        await message.reply(resultado);
+        
+        await message.reply(`¿Deseas consultar otro período para el mismo grupo?\n\n1️⃣ - Sí\n2️⃣ - No, volver al menú principal\n\nEnvía el número de la opción.`);
+        
+        userStates.set(userId, { 
+            estado: 'checklist_consultar_otro_periodo_grupo',
+            datos: { grupo: grupo }
+        });
+        
+    } catch (error) {
+        console.error("Error al obtener resultados del grupo:", error);
+        
+        await message.reply(`❌ *Error al consultar resultados*\n\nNo se pudo obtener la información del grupo ${grupo}.\n\nDetalles: ${error.message}\n\nIntenta nuevamente más tarde.`);
+        
+        userStates.delete(userId);
+        await enviarMenu(message);
+    }
+}
+
+async function obtenerInfoTecnico(message, userId) {
+    await message.reply(
+        `👤 *CONSULTAR TÉCNICO*\n\n` +
+        `Por favor, ingresa el *código del técnico* que deseas consultar.\n\n` +
+        `*Ejemplos:*\n` +
+        `• 12345\n` +
+        `• 76001111\n` +
+        `• 1111\n\n` +
+        `O envía *cancelar* para regresar.`
+    );
+    
+    userStates.set(userId, { 
+        estado: 'checklist_esperando_codigo_tecnico',
+        datos: {}
+    });
+}
+
+async function obtenerMesesTecnico(message, userId, codigoTecnico, añoSeleccionado) {
+    try {
+        const usuariosResponse = await axios.get(`${FIREBASE_CONFIG.databaseURL}/registros.json`, {
+            timeout: 15000
+        });
+        const usuarios = usuariosResponse.data || {};
+        
+        let tecnicoEncontrado = null;
+        let nombreTecnico = null;
+        
+        for (const [userId, usuario] of Object.entries(usuarios)) {
+            if (usuario.codigo && usuario.codigo.toString().includes(codigoTecnico)) {
+                tecnicoEncontrado = usuario;
+                nombreTecnico = `${usuario.nombres || ''} ${usuario.apellidos || ''}`.trim();
+                break;
+            }
+        }
+        
+        if (!tecnicoEncontrado) {
+            await message.reply(`❌ *Técnico no encontrado*\n\nNo se encontró ningún técnico con el código *${codigoTecnico}*.\n\nVerifica el código e intenta nuevamente.`);
+            
+            await obtenerInfoTecnico(message, userId);
+            return;
+        }
+        
+        let menuMeses = `📅 *SELECCIONA EL MES*\n\nTécnico: *${nombreTecnico || 'Desconocido'}* (${codigoTecnico})\nAño: *${añoSeleccionado}*\n\n`;
+        
+        for (let i = 0; i < MESES.length; i++) {
+            menuMeses += `${numeroConEmoji(i + 1)} - ${MESES[i]}\n`;
+        }
+        
+        menuMeses += `\n*Envía el número del mes (1-12)*\nO envía *cancelar* para regresar.`;
+        
+        await message.reply(menuMeses);
+        
+        userStates.set(userId, { 
+            estado: 'checklist_esperando_mes_tecnico',
+            datos: { 
+                codigo: codigoTecnico,
+                tecnico: tecnicoEncontrado,
+                nombre: nombreTecnico,
+                año: añoSeleccionado
+            }
+        });
+        
+    } catch (error) {
+        console.error("Error al buscar técnico:", error);
+        
+        await message.reply(`❌ *Error al buscar técnico*\n\nNo se pudo conectar con la base de datos.\n\nIntenta nuevamente más tarde.`);
+        
+        userStates.delete(userId);
+        await enviarMenu(message);
+    }
+}
+
+async function obtenerResultadosTecnico(message, userId, tecnicoInfo, añoSeleccionado, mesSeleccionado) {
+    try {
+        const codigo = tecnicoInfo.codigo;
+        const nombreCompleto = tecnicoInfo.nombre || `${tecnicoInfo.tecnico.nombres || ''} ${tecnicoInfo.tecnico.apellidos || ''}`.trim();
+        
+        await message.reply(`🔍 Buscando resultados para *${nombreCompleto}* de *${MESES[mesSeleccionado - 1]} ${añoSeleccionado}*...`);
+        
+        const fechaInicio = moment().tz(TIMEZONE).year(añoSeleccionado).month(mesSeleccionado - 1).startOf('month');
+        const fechaFin = moment().tz(TIMEZONE).year(añoSeleccionado).month(mesSeleccionado - 1).endOf('month');
+        
+        console.log(`Consultando reportes desde ${fechaInicio.format('YYYY-MM-DD')} hasta ${fechaFin.format('YYYY-MM-DD')}`);
+        
+        const reportesResponse = await axios.get(`${FIREBASE_CONFIG.databaseURL}/reportes_seguridad.json`, {
+            timeout: 15000
+        });
+        const reportes = reportesResponse.data || {};
+        
+        let diario = 0;
+        let semanal = 0;
+        let mensual = 0;
+        
+        Object.values(reportes).forEach(report => {
+            if (report.usuario === nombreCompleto && report.fecha) {
+                const fechaReporte = moment(report.fecha);
+                if (fechaReporte.isBetween(fechaInicio, fechaFin, null, '[]')) {
+                    if (report.seguimiento === 'diario') diario++;
+                    else if (report.seguimiento === 'semanal') semanal++;
+                    else if (report.seguimiento === 'mensual') mensual++;
+                }
+            }
+        });
+        
+        const limiteDiario = 20;
+        const limiteSemanal = 4;
+        const limiteMensual = 1;
+        
+        const porcentajeDiario = Math.min(Math.round((diario / limiteDiario) * 100), 100);
+        const porcentajeSemanal = Math.min(Math.round((semanal / limiteSemanal) * 100), 100);
+        const porcentajeMensual = Math.min(Math.round((mensual / limiteMensual) * 100), 100);
+        const porcentajeTotal = Math.round((diario/limiteDiario + semanal/limiteSemanal + mensual/limiteMensual) / 3 * 100);
+        
+        let resultado = `📊 *RESULTADOS CHECKLIST DE SEGURIDAD*\n\n`;
+        resultado += `👤 *Técnico:* ${nombreCompleto}\n`;
+        resultado += `🔢 *Código:* ${codigo}\n`;
+        resultado += `📅 *Período:* ${MESES[mesSeleccionado - 1]} ${añoSeleccionado}\n\n`;
+        
+        resultado += `📈 *ESTADÍSTICAS:*\n\n`;
+        
+        resultado += `📅 *Formularios Diarios:*\n`;
+        resultado += `   • Completados: ${diario}\n`;
+        resultado += `   • Límite: ${limiteDiario}\n`;
+        resultado += `   • Porcentaje: ${porcentajeDiario}%\n`;
+        
+        resultado += `   `;
+        for (let i = 0; i < 20; i++) {
+            if (i < Math.round(diario / 2)) resultado += `█`;
+            else resultado += `░`;
+        }
+        resultado += `\n\n`;
+        
+        resultado += `📆 *Formularios Semanales:*\n`;
+        resultado += `   • Completados: ${semanal}\n`;
+        resultado += `   • Límite: ${limiteSemanal}\n`;
+        resultado += `   • Porcentaje: ${porcentajeSemanal}%\n`;
+        
+        resultado += `   `;
+        for (let i = 0; i < 20; i++) {
+            if (i < Math.round(semanal * 5)) resultado += `█`;
+            else resultado += `░`;
+        }
+        resultado += `\n\n`;
+        
+        resultado += `📊 *Formularios Mensuales:*\n`;
+        resultado += `   • Completados: ${mensual}\n`;
+        resultado += `   • Límite: ${limiteMensual}\n`;
+        resultado += `   • Porcentaje: ${porcentajeMensual}%\n`;
+        
+        resultado += `   `;
+        for (let i = 0; i < 20; i++) {
+            if (i < (mensual * 20)) resultado += `█`;
+            else resultado += `░`;
+        }
+        resultado += `\n\n`;
+        
+        resultado += `🎯 *CUMPLIMIENTO TOTAL: ${porcentajeTotal}%*\n\n`;
+        
+        resultado += `📋 *EVALUACIÓN:*\n`;
+        if (porcentajeTotal >= 90) {
+            resultado += `✅ *EXCELENTE* - Cumplimiento sobresaliente\n`;
+        } else if (porcentajeTotal >= 75) {
+            resultado += `👍 *BUENO* - Buen cumplimiento\n`;
+        } else if (porcentajeTotal >= 50) {
+            resultado += `⚠️ *REGULAR* - Necesita mejorar\n`;
+        } else {
+            resultado += `❌ *BAJO* - Incumplimiento crítico\n`;
+        }
+        
+        resultado += `\n⏰ *Consulta:* ${moment().tz(TIMEZONE).format('DD/MM/YYYY HH:mm')}\n`;
+        resultado += `🔗 *Fuente:* Dashboard de seguridad territorial`;
+        
+        await message.reply(resultado);
+        
+        await message.reply(`¿Deseas consultar otro período para el mismo técnico?\n\n1️⃣ - Sí\n2️⃣ - No, volver al menú principal\n\nEnvía el número de la opción.`);
+        
+        userStates.set(userId, { 
+            estado: 'checklist_consultar_otro_periodo_tecnico',
+            datos: { 
+                codigo: codigo,
+                tecnico: tecnicoInfo.tecnico,
+                nombre: nombreCompleto
+            }
+        });
+        
+    } catch (error) {
+        console.error("Error al obtener resultados del técnico:", error);
+        
+        await message.reply(`❌ *Error al consultar resultados*\n\nNo se pudo obtener la información del técnico.\n\nDetalles: ${error.message}\n\nIntenta nuevamente más tarde.`);
+        
+        userStates.delete(userId);
+        await enviarMenu(message);
     }
 }
 
@@ -2429,9 +2545,29 @@ async function buscarSkapOUTS(codigoEmpleado) {
     }
 }
 
-// ============================================
-// FUNCIONES PARA PROGRAMACIÓN DE MENSAJES
-// ============================================
+async function iniciarProgramacion(message) {
+    const userId = message.from;
+    
+    if (scheduledMessages.length > 0) {
+        let mensajeOpciones = "📅 *MENSAJES PROGRAMADOS EXISTENTES*\n\n";
+        
+        scheduledMessages.forEach((msg, index) => {
+            mensajeOpciones += `${index + 1}. Horas: ${msg.horas.join(', ')} - Creado: ${moment(msg.fechaCreacion).tz(TIMEZONE).format('DD/MM/YYYY')}\n`;
+        });
+        
+        mensajeOpciones += "\n*Selecciona una opción:*\n\n";
+        mensajeOpciones += "1️⃣ - Editar mensaje actual\n";
+        mensajeOpciones += "2️⃣ - Crear nuevo registro con horas diferentes\n";
+        mensajeOpciones += "3️⃣ - Eliminar mensaje programado\n";
+        mensajeOpciones += "4️⃣ - Cancelar\n\n";
+        mensajeOpciones += "Envía el número de la opción (1-4)";
+        
+        await message.reply(mensajeOpciones);
+        userStates.set(userId, { estado: 'seleccionar_opcion_existente', datos: {} });
+    } else {
+        await iniciarNuevaProgramacion(message);
+    }
+}
 
 async function iniciarNuevaProgramacion(message) {
     const userId = message.from;
@@ -2936,6 +3072,7 @@ async function manejarConfirmacionGrupos(message, userId, estadoUsuario) {
         if (grupos.length === 0) {
             await message.reply("❌ No hay grupos disponibles. El bot no está en ningún grupo.");
             userStates.delete(userId);
+            await enviarMenu(message);
             return;
         }
         
@@ -3038,6 +3175,7 @@ async function guardarProgramacion(message, userId, estadoUsuario) {
     );
     
     userStates.delete(userId);
+    await enviarMenu(message);
 }
 
 async function manejarOpcionExistente(message, userId, estadoUsuario) {
@@ -3074,14 +3212,170 @@ async function manejarOpcionExistente(message, userId, estadoUsuario) {
     } else if (texto === '4') {
         userStates.delete(userId);
         await message.reply("❌ Operación cancelada. Regresando al menú principal.");
+        await enviarMenu(message);
     } else {
         await message.reply("❌ Opción inválida. Por favor envía un número del 1 al 4.");
     }
 }
 
-// ============================================
-// FUNCIÓN PRINCIPAL DE MANEJO DE ESTADOS
-// ============================================
+async function manejarSeleccionEditar(message, userId, estadoUsuario) {
+    const texto = message.body.trim();
+    const indice = parseInt(texto) - 1;
+    
+    if (isNaN(indice) || indice < 0 || indice >= scheduledMessages.length) {
+        await message.reply("❌ Número inválido. Intenta nuevamente.");
+        return;
+    }
+    
+    const programacionExistente = scheduledMessages[indice];
+    
+    await message.reply(
+        "🔐 *EDITAR MENSAJE PROGRAMADO*\n\n" +
+        "Por favor envía tus credenciales en el formato:\n" +
+        "`usuario:contraseña`\n\n" +
+        "Ejemplo: admin:admin123\n\n" +
+        "O envía *cancelar* para regresar al menú principal."
+    );
+    
+    estadoUsuario.estado = 'esperando_credenciales_editar';
+    estadoUsuario.datos.indiceEditar = indice;
+    estadoUsuario.datos.programacionExistente = programacionExistente;
+    userStates.set(userId, estadoUsuario);
+}
+
+async function manejarSeleccionEliminar(message, userId, estadoUsuario) {
+    const texto = message.body.trim();
+    const indice = parseInt(texto) - 1;
+    
+    if (isNaN(indice) || indice < 0 || indice >= scheduledMessages.length) {
+        await message.reply("❌ Número inválido. Intenta nuevamente.");
+        return;
+    }
+    
+    const programacionEliminar = scheduledMessages[indice];
+    
+    await message.reply(
+        "🔐 *ELIMINAR MENSAJE PROGRAMADO*\n\n" +
+        "Por favor envía tus credenciales en el formato:\n" +
+        "`usuario:contraseña`\n\n" +
+        "Ejemplo: admin:admin123\n\n" +
+        "O envía *cancelar* para regresar al menú principal."
+    );
+    
+    estadoUsuario.estado = 'esperando_credenciales_eliminar';
+    estadoUsuario.datos.indiceEliminar = indice;
+    estadoUsuario.datos.programacionEliminar = programacionEliminar;
+    userStates.set(userId, estadoUsuario);
+}
+
+async function eliminarProgramacion(message, userId, estadoUsuario) {
+    const indice = estadoUsuario.datos.indiceEliminar;
+    const programacionEliminada = scheduledMessages.splice(indice, 1)[0];
+    
+    if (programacionEliminada.archivoInfo && fs.existsSync(programacionEliminada.archivoInfo.ruta)) {
+        try {
+            fs.unlinkSync(programacionEliminada.archivoInfo.ruta);
+        } catch (error) {
+        }
+    }
+    
+    try {
+        const archivoProgramaciones = path.join(__dirname, 'programaciones.json');
+        fs.writeFileSync(archivoProgramaciones, JSON.stringify(scheduledMessages, null, 2));
+    } catch (error) {
+    }
+    
+    await message.reply(
+        "✅ *PROGRAMACIÓN ELIMINADA EXITOSAMENTE*\n\n" +
+        "*Mensaje eliminado:*\n" +
+        `• Horas: ${programacionEliminada.horas.join(', ')}\n` +
+        `• Fecha creación: ${moment(programacionEliminada.fechaCreacion).tz(TIMEZONE).format('DD/MM/YYYY HH:mm')}\n\n` +
+        "¡Gracias por usar el bot! 🚀"
+    );
+    
+    userStates.delete(userId);
+    await enviarMenu(message);
+}
+
+async function manejarSkapILC(message, userId) {
+    userStates.set(userId, { 
+        estado: 'esperando_codigo_skap_ilc',
+        datos: {}
+    });
+    
+    await message.reply(
+        "📋 *CONSULTA SKAP - ILC*\n\n" +
+        "Para poder revisar tus notas de SKAP, envía tu código de empleado a continuación:\n\n" +
+        "*Ejemplos de códigos ILC:*\n" +
+        "• 76001111 (código completo)\n" +
+        "• 1111 (parte del código)\n" +
+        "• 7601260\n" +
+        "• 1260\n" +
+        "• 76011111\n" +
+        "• 11111\n\n" +
+        "*📝 IMPORTANTE:*\n" +
+        "Puedes buscar con el código completo o cualquier parte que coincida.\n" +
+        "El sistema busca en todos los campos posibles.\n\n" +
+        "O envía *cancelar* para regresar al menú."
+    );
+}
+
+async function manejarSkapOUTS(message, userId) {
+    userStates.set(userId, { 
+        estado: 'esperando_codigo_skap_outs',
+        datos: {}
+    });
+    
+    await message.reply(
+        "📋 *CONSULTA SKAP - OUTS*\n\n" +
+        "Para poder revisar tu licencia para operar, envía tu código de empleado a continuación:\n\n" +
+        "*Ejemplos de códigos OUTS:*\n" +
+        "• 11111111 (código completo)\n" +
+        "• 1111 (parte del código)\n" +
+        "• 1111\n" +
+        "• 11111\n" +
+        "• 1111\n\n" +
+        "*📝 IMPORTANTE:*\n" +
+        "Puedes buscar con el código completo o cualquier parte que coincida.\n" +
+        "El sistema busca en todos los campos posibles.\n\n" +
+        "O envía *cancelar* para regresar al menú."
+    );
+}
+
+async function manejarReclamosCalidad(message, userId) {
+    await message.reply("🔍 Consultando reclamos de calidad...");
+    
+    const resultado = await consultarReclamosCalidad();
+    await message.reply(resultado.mensaje);
+    
+    await enviarMenu(message);
+}
+
+async function enviarBienvenidaGrupo(chat) {
+    try {
+        const mensajeBienvenida = 
+            `👋 *¡Hola a todos!*\n\n` +
+            `Mi nombre es *Jarabito* 🤖, tu asistente de seguridad e información de *Jarabe*\n\n` +
+            `*¿Cómo puedo ayudarte?*\n\n` +
+            `Para interactuar conmigo, simplemente escribe el comando:\n` +
+            `*/menu* o */menú*\n\n` +
+            `*✨ Funciones disponibles:*\n` +
+            `• Consultar semáforo de territorios 🚦\n` +
+            `• Consultar información SKAP 📋\n` +
+            `• Acceder a checklists de seguridad ✅\n` +
+            `• Consultar reclamos de calidad 📊\n` +
+            `• Consultar CIP Jarabe Terminado 🧪\n` +
+            `• Y mucho más...\n\n` +
+            `*⚠️ IMPORTANTE:*\n` +
+            `Solo responderé cuando uses el comando */menu* o */menú* primero.\n\n` +
+            `¡Estoy aquí para ayudar! 🚀`;
+        
+        await chat.sendMessage(mensajeBienvenida);
+        console.log(`✅ Mensaje de bienvenida enviado al grupo: ${chat.name}`);
+    } catch (error) {
+        console.error("❌ Error al enviar mensaje de bienvenida:", error);
+    }
+}
 
 async function manejarEstadoUsuario(message, userId) {
     const estadoUsuario = userStates.get(userId);
@@ -3094,68 +3388,482 @@ async function manejarEstadoUsuario(message, userId) {
         return;
     }
     
-    // Mapeo de estados a funciones
-    const stateHandlers = {
-        // Guardian (Opción 2)
-        'guardian_esperando_codigo': () => procesarCodigoGuardian(message, userId, estadoUsuario),
-        'guardian_esperando_anio': () => procesarAnioGuardian(message, userId, estadoUsuario),
-        'guardian_esperando_mes': () => procesarMesGuardian(message, userId, estadoUsuario),
-        
-        // Checklist (Opción 3)
-        'checklist_menu_principal': () => procesarChecklistMenuPrincipal(message, userId, estadoUsuario),
-        
-        // CIP (Opción 7)
-        'cip_esperando_tanque': () => procesarSeleccionTanqueCIP(message, userId, estadoUsuario),
-        'cip_esperando_tipo_busqueda': () => procesarTipoBusquedaCIP(message, userId, estadoUsuario),
-        'cip_esperando_rango_fechas': () => procesarRangoFechasCIP(message, userId, estadoUsuario),
-        'cip_esperando_mes': () => procesarSeleccionMesCIP(message, userId, estadoUsuario),
-        'cip_esperando_anio': () => procesarSeleccionAnioCIP(message, userId, estadoUsuario),
-        'cip_esperando_formato_descarga': () => procesarFormatoDescargaCIP(message, userId, estadoUsuario),
-        
-        // SKAP (Opción 10)
-        'seleccionar_tipo_skap': () => procesarSeleccionTipoSkap(message, userId, estadoUsuario),
-        'esperando_codigo_skap_ilc': () => procesarCodigoSkapILC(message, userId, estadoUsuario),
-        'esperando_codigo_skap_outs': () => procesarCodigoSkapOUTS(message, userId, estadoUsuario),
-        
-        // Programación de mensajes (Opción 9)
-        'seleccionar_opcion_existente': () => manejarOpcionExistente(message, userId, estadoUsuario),
-        'esperando_credenciales': () => manejarCredenciales(message, userId, estadoUsuario),
-        'seleccionar_tipo_contenido': () => manejarTipoContenido(message, userId, estadoUsuario),
-        'esperando_archivo': () => manejarArchivo(message, userId, estadoUsuario),
-        'esperando_mensaje': () => manejarMensajeTexto(message, userId, estadoUsuario),
-        'seleccionar_cantidad_horas': () => manejarCantidadHoras(message, userId, estadoUsuario),
-        'esperando_hora_unica': () => manejarHoraUnica(message, userId, estadoUsuario),
-        'esperando_horas': () => manejarHorasDos(message, userId, estadoUsuario),
-        'esperando_tres_horas': () => manejarTresHoras(message, userId, estadoUsuario),
-        'seleccionar_frecuencia': () => manejarFrecuencia(message, userId, estadoUsuario),
-        'esperando_fecha_inicio': () => manejarFechaInicio(message, userId, estadoUsuario),
-        'esperando_fecha_fin': () => manejarFechaFin(message, userId, estadoUsuario),
-        'esperando_confirmacion_grupos': () => manejarConfirmacionGrupos(message, userId, estadoUsuario),
-        'seleccionando_grupos': () => manejarSeleccionGrupos(message, userId, estadoUsuario),
-        'mostrando_vista_previa': () => {
-            if (texto === '1' || texto === 'sí' || texto === 'si') {
-                guardarProgramacion(message, userId, estadoUsuario);
-            } else if (texto === '2' || texto === 'no') {
-                userStates.delete(userId);
-                message.reply("❌ Programación cancelada.");
-            } else {
-                message.reply("Por favor selecciona:\n1 - Sí, guardar\n2 - No, cancelar");
-            }
-        }
-    };
+    if (estadoUsuario.estado === 'cip_esperando_tanque') {
+        await manejarSeleccionTanque(message, userId, estadoUsuario);
+        return;
+    }
     
-    const handler = stateHandlers[estadoUsuario.estado];
-    if (handler) {
-        await handler();
-    } else {
+    if (estadoUsuario.estado === 'cip_esperando_tipo_busqueda') {
+        await manejarTipoBusqueda(message, userId, estadoUsuario);
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'cip_esperando_rango_fechas') {
+        await manejarRangoFechas(message, userId, estadoUsuario);
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'cip_esperando_mes') {
+        await manejarSeleccionMes(message, userId, estadoUsuario);
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'cip_esperando_anio') {
+        await manejarSeleccionAnio(message, userId, estadoUsuario);
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'cip_esperando_formato_descarga') {
+        await manejarFormatoDescarga(message, userId, estadoUsuario);
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'guardian_esperando_codigo') {
+        const codigo = message.body.trim();
+        
+        if (!codigo || codigo === '') {
+            await message.reply("❌ Por favor ingresa un código válido.");
+            return;
+        }
+        
+        estadoUsuario.datos.codigo = codigo;
+        estadoUsuario.estado = 'guardian_esperando_anio';
+        userStates.set(userId, estadoUsuario);
+        
+        const añoActual = moment().tz(TIMEZONE).year();
+        const años = [añoActual, añoActual - 1, añoActual - 2];
+        
+        let menuAños = `📅 *SELECCIONA EL AÑO*\n\n`;
+        años.forEach((año, index) => {
+            menuAños += `${numeroConEmoji(index + 1)} - ${año}\n`;
+        });
+        
+        menuAños += `\n*Envía el número del año*\nO envía *cancelar* para regresar.`;
+        
+        await message.reply(menuAños);
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'guardian_esperando_anio') {
+        const opcion = parseInt(texto);
+        
+        if (isNaN(opcion) || opcion < 1 || opcion > 3) {
+            await message.reply("❌ Opción inválida. Por favor envía un número del 1 al 3.");
+            return;
+        }
+        
+        const añoActual = moment().tz(TIMEZONE).year();
+        const años = [añoActual, añoActual - 1, añoActual - 2];
+        const añoSeleccionado = años[opcion - 1];
+        
+        estadoUsuario.datos.anio = añoSeleccionado;
+        estadoUsuario.estado = 'guardian_esperando_mes';
+        userStates.set(userId, estadoUsuario);
+        
+        let menuMeses = `📅 *SELECCIONA EL MES*\n\n`;
+        MESES.forEach((mes, index) => {
+            menuMeses += `${numeroConEmoji(index + 1)} - ${mes}\n`;
+        });
+        
+        menuMeses += `\n*Envía el número del mes (1-12)*\nO envía *cancelar* para regresar.`;
+        
+        await message.reply(menuMeses);
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'guardian_esperando_mes') {
+        const mes = parseInt(texto);
+        
+        if (isNaN(mes) || mes < 1 || mes > 12) {
+            await message.reply("❌ Opción inválida. Por favor envía un número del 1 al 12.");
+            return;
+        }
+        
+        await message.reply("🔍 Consultando Guardian...");
+        
+        const resultado = await consultarGuardian(
+            estadoUsuario.datos.codigo,
+            mes,
+            estadoUsuario.datos.anio
+        );
+        
+        await message.reply(resultado.mensaje);
+        
         userStates.delete(userId);
         await enviarMenu(message);
+        return;
     }
+    
+    if (estadoUsuario.estado === 'checklist_menu_principal') {
+        if (texto === '1') {
+            await obtenerGruposDisponibles(message, userId);
+        } else if (texto === '2') {
+            await obtenerInfoTecnico(message, userId);
+        } else {
+            await message.reply("❌ Opción inválida. Por favor envía 1 para Grupos o 2 para Técnicos.");
+        }
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'checklist_esperando_grupo') {
+        const opcion = parseInt(texto);
+        const grupos = estadoUsuario.datos.grupos;
+        
+        if (isNaN(opcion) || opcion < 1 || opcion > grupos.length) {
+            await message.reply(`❌ Opción inválida. Por favor envía un número del 1 al ${grupos.length}.`);
+            return;
+        }
+        
+        const grupoSeleccionado = grupos[opcion - 1];
+        await obtenerAnosDisponibles(message, userId, 'grupo', grupoSeleccionado);
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'checklist_esperando_ano_grupo') {
+        const opcion = parseInt(texto);
+        const anos = estadoUsuario.datos.anos;
+        
+        if (isNaN(opcion) || opcion < 1 || opcion > anos.length) {
+            await message.reply(`❌ Opción inválida. Por favor envía un número del 1 al ${anos.length}.`);
+            return;
+        }
+        
+        const añoSeleccionado = anos[opcion - 1];
+        await obtenerMesesGrupo(message, userId, estadoUsuario.datos.grupo, añoSeleccionado);
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'checklist_esperando_mes_grupo') {
+        const mes = parseInt(texto);
+        
+        if (isNaN(mes) || mes < 1 || mes > 12) {
+            await message.reply("❌ Opción inválida. Por favor envía un número del 1 al 12.");
+            return;
+        }
+        
+        await obtenerResultadosGrupo(message, userId, estadoUsuario.datos.grupo, estadoUsuario.datos.año, mes);
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'checklist_consultar_otro_periodo_grupo') {
+        if (texto === '1') {
+            await obtenerAnosDisponibles(message, userId, 'grupo', estadoUsuario.datos.grupo);
+        } else if (texto === '2') {
+            userStates.delete(userId);
+            await enviarMenu(message);
+        } else {
+            await message.reply("❌ Opción inválida. Por favor envía 1 para otro período o 2 para volver al menú.");
+        }
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'checklist_esperando_codigo_tecnico') {
+        const codigo = message.body.trim();
+        
+        if (!codigo || codigo === '') {
+            await message.reply("❌ Por favor ingresa un código válido.");
+            return;
+        }
+        
+        await obtenerAnosDisponibles(message, userId, 'tecnico', codigo);
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'checklist_esperando_ano_tecnico') {
+        const opcion = parseInt(texto);
+        const anos = estadoUsuario.datos.anos;
+        
+        if (isNaN(opcion) || opcion < 1 || opcion > anos.length) {
+            await message.reply(`❌ Opción inválida. Por favor envía un número del 1 al ${anos.length}.`);
+            return;
+        }
+        
+        const añoSeleccionado = anos[opcion - 1];
+        await obtenerMesesTecnico(message, userId, estadoUsuario.datos.tecnico, añoSeleccionado);
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'checklist_esperando_mes_tecnico') {
+        const mes = parseInt(texto);
+        
+        if (isNaN(mes) || mes < 1 || mes > 12) {
+            await message.reply("❌ Opción inválida. Por favor envía un número del 1 al 12.");
+            return;
+        }
+        
+        await obtenerResultadosTecnico(message, userId, estadoUsuario.datos, estadoUsuario.datos.año, mes);
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'checklist_consultar_otro_periodo_tecnico') {
+        if (texto === '1') {
+            await obtenerAnosDisponibles(message, userId, 'tecnico', estadoUsuario.datos.codigo);
+        } else if (texto === '2') {
+            userStates.delete(userId);
+            await enviarMenu(message);
+        } else {
+            await message.reply("❌ Opción inválida. Por favor envía 1 para otro período o 2 para volver al menú.");
+        }
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'esperando_codigo_skap_ilc') {
+        const codigoEmpleado = message.body.trim();
+        
+        if (!codigoEmpleado || codigoEmpleado === '') {
+            await message.reply("❌ Por favor ingresa un código válido.");
+            return;
+        }
+        
+        await message.reply("🔍 Buscando información de SKAP ILC...");
+        
+        try {
+            const resultado = await buscarSkapILC(codigoEmpleado);
+            await message.reply(resultado);
+            
+        } catch (error) {
+            console.error("Error en búsqueda ILC:", error.message);
+            await message.reply("❌ Error en la búsqueda. Intenta nuevamente.");
+        }
+        
+        userStates.delete(userId);
+        await enviarMenu(message);
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'esperando_codigo_skap_outs') {
+        const codigoEmpleado = message.body.trim();
+        
+        if (!codigoEmpleado || codigoEmpleado === '') {
+            await message.reply("❌ Por favor ingresa un código válido.");
+            return;
+        }
+        
+        await message.reply("🔍 Buscando información de SKAP OUTS...");
+        
+        try {
+            const resultado = await buscarSkapOUTS(codigoEmpleado);
+            await message.reply(resultado);
+            
+        } catch (error) {
+            console.error("Error en búsqueda OUTS:", error.message);
+            await message.reply("❌ Error en la búsqueda. Intenta nuevamente.");
+        }
+        
+        userStates.delete(userId);
+        await enviarMenu(message);
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'seleccionar_tipo_skap') {
+        if (texto === '1') {
+            await manejarSkapILC(message, userId);
+        } else if (texto === '2') {
+            await manejarSkapOUTS(message, userId);
+        } else {
+            await message.reply("❌ Opción inválida. Por favor envía 1 para ILC o 2 para OUTS.");
+        }
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'seleccionar_opcion_existente') {
+        await manejarOpcionExistente(message, userId, estadoUsuario);
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'seleccionar_editar') {
+        await manejarSeleccionEditar(message, userId, estadoUsuario);
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'seleccionar_eliminar') {
+        await manejarSeleccionEliminar(message, userId, estadoUsuario);
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'esperando_credenciales_editar' || estadoUsuario.estado === 'esperando_credenciales_eliminar') {
+        if (texto.includes(':')) {
+            const partes = texto.split(':');
+            const usuario = partes[0].trim();
+            const contrasena = partes[1].trim();
+            
+            if (usuario === ADMIN_CREDENTIALS.username && contrasena === ADMIN_CREDENTIALS.password) {
+                if (estadoUsuario.estado === 'esperando_credenciales_editar') {
+                    estadoUsuario.estado = 'seleccionar_tipo_contenido_editar';
+                    estadoUsuario.datos = {
+                        ...estadoUsuario.datos.programacionExistente,
+                        indiceEditar: estadoUsuario.datos.indiceEditar
+                    };
+                    userStates.set(userId, estadoUsuario);
+                    
+                    await message.reply(
+                        "✅ *Credenciales correctas*\n\n" +
+                        "¿Qué tipo de contenido deseas programar?\n\n" +
+                        "1️⃣ - Mantener archivo actual\n" +
+                        "2️⃣ - Cambiar imagen\n" +
+                        "3️⃣ - Cambiar video\n" +
+                        "4️⃣ - Cambiar documento\n" +
+                        "5️⃣ - Solo texto (sin archivo adjunto)\n\n" +
+                        "Envía el número de la opción (1-5)"
+                    );
+                } else {
+                    await eliminarProgramacion(message, userId, estadoUsuario);
+                }
+            } else {
+                await message.reply("❌ Credenciales incorrectas. Intenta nuevamente.");
+            }
+        } else {
+            await message.reply("Formato incorrecto. Usa: usuario:contraseña");
+        }
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'seleccionar_tipo_contenido_editar') {
+        const opcion = texto;
+        
+        if (opcion === '1') {
+            estadoUsuario.estado = 'esperando_mensaje_editar';
+            userStates.set(userId, estadoUsuario);
+            
+            await message.reply(
+                "✅ *Archivo conservado*\n\n" +
+                "Ahora envía el NUEVO mensaje de texto:\n\n" +
+                "O envía *omitir* si solo quieres enviar el archivo sin texto.\n" +
+                "O envía *mantener* para conservar el mensaje actual."
+            );
+            
+        } else if (opcion === '2') {
+            estadoUsuario.datos.tipoContenido = 'imagen';
+            estadoUsuario.estado = 'esperando_archivo_editar';
+            userStates.set(userId, estadoUsuario);
+            
+            await message.reply(
+                "📸 *CAMBIAR IMAGEN*\n\n" +
+                "Envía la NUEVA imagen:\n\n" +
+                "O envía *mantener* para conservar la imagen actual."
+            );
+            
+        } else if (opcion === '3') {
+            estadoUsuario.datos.tipoContenido = 'video';
+            estadoUsuario.estado = 'esperando_archivo_editar';
+            userStates.set(userId, estadoUsuario);
+            
+            await message.reply(
+                "🎬 *CAMBIAR VIDEO*\n\n" +
+                "Envía el NUEVO video:\n\n" +
+                "O envía *mantener* para conservar el video actual."
+            );
+            
+        } else if (opcion === '4') {
+            estadoUsuario.datos.tipoContenido = 'documento';
+            estadoUsuario.estado = 'esperando_archivo_editar';
+            userStates.set(userId, estadoUsuario);
+            
+            await message.reply(
+                "📄 *CAMBIAR DOCUMENTO*\n\n" +
+                "Envía el NUEVO documento:\n\n" +
+                "O envía *mantener* para conservar el documento actual."
+            );
+            
+        } else if (opcion === '5') {
+            estadoUsuario.datos.tipoContenido = 'texto';
+            estadoUsuario.datos.archivoInfo = null;
+            estadoUsuario.estado = 'esperando_mensaje_editar';
+            userStates.set(userId, estadoUsuario);
+            
+            await message.reply(
+                "📝 *SOLO TEXTO*\n\n" +
+                "Ahora envía el NUEVO mensaje de texto:\n\n" +
+                "O envía *mantener* para conservar el mensaje actual."
+            );
+            
+        } else {
+            await message.reply("❌ Opción inválida. Por favor envía un número del 1 al 5.");
+        }
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'esperando_credenciales') {
+        await manejarCredenciales(message, userId, estadoUsuario);
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'seleccionar_tipo_contenido') {
+        await manejarTipoContenido(message, userId, estadoUsuario);
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'esperando_archivo') {
+        await manejarArchivo(message, userId, estadoUsuario);
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'esperando_mensaje') {
+        await manejarMensajeTexto(message, userId, estadoUsuario);
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'seleccionar_cantidad_horas') {
+        await manejarCantidadHoras(message, userId, estadoUsuario);
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'esperando_hora_unica') {
+        await manejarHoraUnica(message, userId, estadoUsuario);
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'esperando_horas') {
+        await manejarHorasDos(message, userId, estadoUsuario);
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'esperando_tres_horas') {
+        await manejarTresHoras(message, userId, estadoUsuario);
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'seleccionar_frecuencia') {
+        await manejarFrecuencia(message, userId, estadoUsuario);
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'esperando_fecha_inicio') {
+        await manejarFechaInicio(message, userId, estadoUsuario);
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'esperando_fecha_fin') {
+        await manejarFechaFin(message, userId, estadoUsuario);
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'esperando_confirmacion_grupos') {
+        await manejarConfirmacionGrupos(message, userId, estadoUsuario);
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'seleccionando_grupos') {
+        await manejarSeleccionGrupos(message, userId, estadoUsuario);
+        return;
+    }
+    
+    if (estadoUsuario.estado === 'mostrando_vista_previa') {
+        if (texto === '1' || texto === 'sí' || texto === 'si') {
+            await guardarProgramacion(message, userId, estadoUsuario);
+        } else if (texto === '2' || texto === 'no') {
+            userStates.delete(userId);
+            await message.reply("❌ Programación cancelada. Volviendo al menú principal.");
+            await enviarMenu(message);
+        } else {
+            await message.reply("Por favor selecciona:\n1 - Sí, guardar\n2 - No, cancelar");
+        }
+        return;
+    }
+    
+    userStates.delete(userId);
+    await enviarMenu(message);
 }
-
-// ============================================
-// FUNCIÓN PARA ENVIAR MENÚ PRINCIPAL
-// ============================================
 
 async function enviarMenu(message) {
     const saludo = obtenerSaludo();
@@ -3180,55 +3888,47 @@ async function enviarMenu(message) {
     await message.reply(menu);
 }
 
-// ============================================
-// FUNCIÓN PARA MANEJAR OPCIONES DEL MENÚ
-// ============================================
-
 async function manejarOpcionMenu(message, opcion) {
-    const userId = message.from;
+    const links = {
+        1: "https://ab-inbev.acadia.sysalli.com/documents?filter=lang-eql:es-mx&page=1&pagesize=50",
+        6: "https://energia2-7e868.web.app/",
+        8: "https://cip-jarabesimple.web.app/"
+    };
     
-    // Limpiar cualquier estado previo
-    userStates.delete(userId);
-    
-    switch(opcion) {
-        case 1: // Acadia
-            await manejarAcadia(message);
-            break;
-        case 2: // Guardian
-            await manejarGuardian(message, userId);
-            break;
-        case 3: // Checklist
-            await manejarChecklistSeguridad(message, userId);
-            break;
-        case 4: // Semáforo
-            await manejarSemaforoTerritorio(message);
-            break;
-        case 5: // Reclamos
-            await manejarReclamosCalidad(message);
-            break;
-        case 6: // Energía
-            await manejarEnergia(message);
-            break;
-        case 7: // CIP Terminado
-            await manejarCIPJarabeTerminado(message, userId);
-            break;
-        case 8: // CIP Simple
-            await manejarCIPJarabeSimple(message);
-            break;
-        case 9: // Programar
-            await manejarProgramarMensajes(message, userId);
-            break;
-        case 10: // SKAP
-            await manejarSKAP(message, userId);
-            break;
-        default:
-            await message.reply("❌ Opción no válida. Por favor envía un número del 1 al 10.");
+    if (opcion === 1) {
+        await message.reply(`🔗 *Enlace para la opción ${opcion}:*\n${links[opcion]}\n\n*Nota:* Haz click en el enlace para poder entrar.`);
+    } else if (opcion === 2) {
+        await manejarGuardian(message, message.from);
+    } else if (opcion === 3) {
+        await obtenerChecklistSeguridad(message, message.from);
+    } else if (opcion === 4) {
+        await message.reply("⏳ Consultando semáforo de territorio...");
+        const resultado = await obtenerSemaforoTerritorio();
+        await message.reply(resultado);
+    } else if (opcion === 5) {
+        await manejarReclamosCalidad(message, message.from);
+    } else if (opcion === 6) {
+        await message.reply(`🔗 *Enlace para la opción ${opcion}:*\n${links[opcion]}\n\n*Nota:* Haz click en el enlace para poder entrar.`);
+    } else if (opcion === 7) {
+        await manejarCIPJarabeTerminado(message, message.from);
+    } else if (opcion === 8) {
+        await message.reply(`🔗 *Enlace para la opción ${opcion}:*\n${links[opcion]}\n\n*Nota:* Haz click en el enlace para poder entrar.`);
+    } else if (opcion === 9) {
+        await iniciarProgramacion(message);
+    } else if (opcion === 10) {
+        const userId = message.from;
+        userStates.set(userId, { estado: 'seleccionar_tipo_skap', datos: {} });
+        
+        await message.reply(
+            "📋 *SISTEMA SKAP*\n\n" +
+            "Elige el tipo de consulta:\n\n" +
+            "1️⃣ - *ILC*\n" +
+            "2️⃣ - *OUTS*\n\n" +
+            "Envía el número de la opción (1-2)\n" +
+            "O envía *cancelar* para regresar al menú principal."
+        );
     }
 }
-
-// ============================================
-// FUNCIONES PARA MENSAJES PROGRAMADOS
-// ============================================
 
 async function verificarMensajesProgramados() {
     const horaActual = moment().tz(TIMEZONE).format('HH:mm');
@@ -3349,26 +4049,6 @@ async function enviarMensajeProgramado(programacion) {
     }
 }
 
-function cargarProgramacionesGuardadas() {
-    try {
-        const archivoProgramaciones = path.join(__dirname, 'programaciones.json');
-        if (fs.existsSync(archivoProgramaciones)) {
-            const contenido = fs.readFileSync(archivoProgramaciones, 'utf8');
-            const programaciones = JSON.parse(contenido);
-            
-            scheduledMessages.length = 0;
-            scheduledMessages.push(...programaciones);
-            console.log(`📂 Cargadas ${programaciones.length} programaciones guardadas`);
-        }
-    } catch (error) {
-        console.error("Error al cargar programaciones guardadas:", error);
-    }
-}
-
-// ============================================
-// EVENTOS DEL CLIENTE
-// ============================================
-
 client.on('qr', qr => {
     console.clear();
     console.log('╔══════════════════════════════════════════════════════════╗');
@@ -3416,6 +4096,22 @@ client.on('loading_screen', (percent, message) => {
     console.log(`🔄 Cargando: ${percent}% - ${message}`);
 });
 
+function cargarProgramacionesGuardadas() {
+    try {
+        const archivoProgramaciones = path.join(__dirname, 'programaciones.json');
+        if (fs.existsSync(archivoProgramaciones)) {
+            const contenido = fs.readFileSync(archivoProgramaciones, 'utf8');
+            const programaciones = JSON.parse(contenido);
+            
+            scheduledMessages.length = 0;
+            scheduledMessages.push(...programaciones);
+            console.log(`📂 Cargadas ${programaciones.length} programaciones guardadas`);
+        }
+    } catch (error) {
+        console.error("Error al cargar programaciones guardadas:", error);
+    }
+}
+
 client.on('group_join', async (notification) => {
     console.log(`🤖 *Jarabito* fue agregado al grupo: ${notification.chatId}`);
     
@@ -3429,32 +4125,6 @@ client.on('group_join', async (notification) => {
     }
 });
 
-async function enviarBienvenidaGrupo(chat) {
-    try {
-        const mensajeBienvenida = 
-            `👋 *¡Hola a todos!*\n\n` +
-            `Mi nombre es *Jarabito* 🤖, tu asistente de seguridad e información de *Jarabe*\n\n` +
-            `*¿Cómo puedo ayudarte?*\n\n` +
-            `Para interactuar conmigo, simplemente escribe el comando:\n` +
-            `*/menu* o */menú*\n\n` +
-            `*✨ Funciones disponibles:*\n` +
-            `• Consultar semáforo de territorios 🚦\n` +
-            `• Consultar información SKAP 📋\n` +
-            `• Acceder a checklists de seguridad ✅\n` +
-            `• Consultar reclamos de calidad 📊\n` +
-            `• Consultar CIP Jarabe Terminado 🧪\n` +
-            `• Y mucho más...\n\n` +
-            `*⚠️ IMPORTANTE:*\n` +
-            `Solo responderé cuando uses el comando */menu* o */menú* primero.\n\n` +
-            `¡Estoy aquí para ayudar! 🚀`;
-        
-        await chat.sendMessage(mensajeBienvenida);
-        console.log(`✅ Mensaje de bienvenida enviado al grupo: ${chat.name}`);
-    } catch (error) {
-        console.error("❌ Error al enviar mensaje de bienvenida:", error);
-    }
-}
-
 client.on('message', async message => {
     try {
         const texto = message.body.trim();
@@ -3462,25 +4132,21 @@ client.on('message', async message => {
         
         console.log(`📩 [${moment().tz(TIMEZONE).format('HH:mm:ss')}] Mensaje de ${userId}: ${texto.substring(0, 50)}...`);
         
-        // Si el usuario tiene un estado activo, manejar según ese estado
         if (userStates.has(userId)) {
             await manejarEstadoUsuario(message, userId);
             return;
         }
         
-        // Comando para mostrar menú
         if (texto.toLowerCase() === '/menu' || texto.toLowerCase() === '/menú') {
             await enviarMenu(message);
             return;
         }
         
-        // Si es un número del 1-10, procesar como opción del menú
         if (/^[1-9]$|^10$/.test(texto)) {
             await manejarOpcionMenu(message, parseInt(texto));
             return;
         }
         
-        // Comando de ayuda
         if (texto.toLowerCase() === 'ayuda' || texto.toLowerCase() === 'help') {
             await message.reply(
                 "🤖 *BOT JARABITO - ASISTENTE DE SEGURIDAD Y INFORMACIÓN.*\n\n" +
@@ -3495,7 +4161,6 @@ client.on('message', async message => {
             return;
         }
         
-        // En grupos, ignorar mensajes que no sean comandos
         if (message.from.endsWith('@g.us')) {
             if (!texto.startsWith('/') && !/^[1-9]$|^10$/.test(texto) && texto.toLowerCase() !== 'ayuda') {
                 return;
@@ -3507,15 +4172,17 @@ client.on('message', async message => {
     }
 });
 
+client.on('auth_failure', msg => {
+    console.error('❌ Error de autenticación:', msg);
+    console.log('🔄 Reiniciando en 10 segundos...');
+    setTimeout(() => client.initialize(), 10000);
+});
+
 client.on('disconnected', reason => {
     console.log('❌ Desconectado:', reason);
     console.log('🔄 Reconectando en 5 segundos...');
     setTimeout(() => client.initialize(), 5000);
 });
-
-// ============================================
-// FUNCIÓN PRINCIPAL PARA INICIAR EL BOT
-// ============================================
 
 async function iniciarBot() {
     console.log('╔══════════════════════════════════════════════════════════╗');
@@ -3535,12 +4202,11 @@ async function iniciarBot() {
     setInterval(() => {
         if (client.info) {
             const ahora = moment().tz(TIMEZONE);
-            console.log(`[${ahora.format('HH:mm:ss')}] 🤖 Bot activo | Programaciones: ${scheduledMessages.length} | Usuarios activos: ${userStates.size}`);
+            console.log(`[${ahora.format('HH:mm:ss')}] 🤖 Bot activo | Programaciones: ${scheduledMessages.length} | Usuarios: ${userStates.size}`);
         }
     }, 300000);
 }
 
-// Manejo de cierre del proceso
 process.on('SIGINT', async () => {
     console.log('\n\n👋 Cerrando bot de WhatsApp...');
     
@@ -3556,7 +4222,6 @@ process.on('SIGINT', async () => {
     console.log('✅ Bot cerrado correctamente');
     process.exit(0);
 });
-
 // --- CONFIGURACIÓN DEL SERVIDOR WEB PARA RENDER ---
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -3569,7 +4234,6 @@ app.listen(PORT, () => {
     console.log(`🌐 Servidor web iniciado en el puerto ${PORT}`);
 });
 
-// Iniciar el bot
 iniciarBot().catch(error => {
     console.error('❌ ERROR CRÍTICO AL INICIAR:', error);
     console.log('\n💡 POSIBLES SOLUCIONES:');
