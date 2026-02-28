@@ -6,6 +6,7 @@ const moment = require('moment-timezone');
 const axios = require('axios');
 const XLSX = require('xlsx');
 const PDFDocument = require('pdfkit');
+const express = require('express');
 
 const TIMEZONE = 'America/El_Salvador';
 const ADMIN_CREDENTIALS = {
@@ -4217,6 +4218,17 @@ process.on('SIGINT', async () => {
     await client.destroy();
     console.log('✅ Bot cerrado correctamente');
     process.exit(0);
+});
+// --- CONFIGURACIÓN DEL SERVIDOR WEB PARA RENDER ---
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.get('/', (req, res) => {
+    res.send('🤖 Bot Jarabito está activo y funcionando en Render!');
+});
+
+app.listen(PORT, () => {
+    console.log(`🌐 Servidor web iniciado en el puerto ${PORT}`);
 });
 
 iniciarBot().catch(error => {
