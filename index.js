@@ -6,7 +6,6 @@ const moment = require('moment-timezone');
 const axios = require('axios');
 const XLSX = require('xlsx');
 const PDFDocument = require('pdfkit');
-const express = require('express');
 
 const TIMEZONE = 'America/El_Salvador';
 const ADMIN_CREDENTIALS = {
@@ -76,9 +75,7 @@ const client = new Client({
         dataPath: path.join(__dirname, 'whatsapp-session')
     }),
     puppeteer: {
-        headless: true, 
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
-        dumpio: true,
+        headless: "new",
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -86,14 +83,13 @@ const client = new Client({
             '--disable-accelerated-2d-canvas',
             '--no-first-run',
             '--no-zygote',
-            '--disable-gpu',
-            '--single-process',
-            '--disable-software-rasterizer',
-            '--mute-audio',
-            '--disable-extensions'
+            '--disable-gpu'
         ]
+    },
+    webVersionCache: {
+        type: "remote",
+        remotePath: "https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html"
     }
-    
 });
 
 function crearCarpetas() {
@@ -810,6 +806,7 @@ async function procesarExcelDesdeBase64(base64) {
     }
 }
 
+// FUNCIÓN PRINCIPAL DE GUARDIAN - SOLO MUESTRA ACCIONES INSEGURAS DONDE EL USUARIO ES IMPLICADO EN SOFTDRINKS
 async function consultarGuardian(codigoEmpleado, mesSeleccionado, anioSeleccionado) {
     try {
         console.log(`🔍 Consultando Guardian para código: ${codigoEmpleado}, mes: ${mesSeleccionado}, año: ${anioSeleccionado}`);
@@ -855,37 +852,45 @@ async function consultarGuardian(codigoEmpleado, mesSeleccionado, anioSelecciona
         const COLUMNA_AREA_OBSERVADOR = 'Área del observador';
         const COLUMNA_PILAR_MEDIO_AMBIENTE = 'Pilar del medio ambiente';
         
-        const accionesInsegurasComoImplicado = todosLosRegistros.filter(reg => {
-            const esAccionInsegura = reg.tipoReporte === 'accion_insegura';
-            const idImplicado = reg[COLUMNA_ID_IMPLICADO] ? reg[COLUMNA_ID_IMPLICADO].toString().trim() : '';
-            const coincideId = idImplicado.includes(codigoEmpleado) || codigoEmpleado.includes(idImplicado);
-            return esAccionInsegura && coincideId;
-        });
-        
+        // Registros donde el usuario es OBSERVADOR (reportes que él hizo)
         const registrosComoObservador = todosLosRegistros.filter(reg => {
             const idObservador = reg[COLUMNA_ID_OBSERVADOR] ? reg[COLUMNA_ID_OBSERVADOR].toString().trim() : '';
             return idObservador.includes(codigoEmpleado) || codigoEmpleado.includes(idObservador);
         });
         
-        const accionesInsegurasSoftDrinks = todosLosRegistros.filter(reg => {
+        // SOLO acciones inseguras donde el usuario es IMPLICADO y además está en Área del implicado de SoftDrinks
+        const accionesInsegurasComoImplicadoSoftDrinks = todosLosRegistros.filter(reg => {
             const esAccionInsegura = reg.tipoReporte === 'accion_insegura';
             if (!esAccionInsegura) return false;
             
-            const areaImplicado = reg[COLUMNA_AREA_IMPLICADO] ? reg[COLUMNA_AREA_IMPLICADO].toString().toLowerCase() : '';
-            const areaObservador = reg[COLUMNA_AREA_OBSERVADOR] ? reg[COLUMNA_AREA_OBSERVADOR].toString().toLowerCase() : '';
             const idImplicado = reg[COLUMNA_ID_IMPLICADO] ? reg[COLUMNA_ID_IMPLICADO].toString().trim() : '';
-            const idObservador = reg[COLUMNA_ID_OBSERVADOR] ? reg[COLUMNA_ID_OBSERVADOR].toString().trim() : '';
+            const areaImplicado = reg[COLUMNA_AREA_IMPLICADO] ? reg[COLUMNA_AREA_IMPLICADO].toString().toLowerCase() : '';
             
-            const esSoftDrinks = areaImplicado.includes('softdrinks') || areaObservador.includes('softdrinks');
-            const coincideCodigo = idImplicado.includes(codigoEmpleado) || 
-                                  codigoEmpleado.includes(idImplicado) ||
-                                  idObservador.includes(codigoEmpleado) || 
-                                  codigoEmpleado.includes(idObservador);
+            // Verificar que el código coincida con el ID del implicado
+            const coincideCodigo = idImplicado.includes(codigoEmpleado) || codigoEmpleado.includes(idImplicado);
             
-            return esSoftDrinks && coincideCodigo;
+            // Verificar que el área del implicado sea SoftDrinks
+            const esSoftDrinks = areaImplicado.includes('softdrinks');
+            
+            // Solo incluir si es implicado Y está en SoftDrinks
+            return coincideCodigo && esSoftDrinks;
         });
         
-        if (registrosComoObservador.length === 0 && accionesInsegurasComoImplicado.length === 0 && accionesInsegurasSoftDrinks.length === 0) {
+        // Acciones inseguras donde es implicado pero NO en SoftDrinks (para estadísticas generales)
+        const accionesInsegurasComoImplicadoNoSoftDrinks = todosLosRegistros.filter(reg => {
+            const esAccionInsegura = reg.tipoReporte === 'accion_insegura';
+            if (!esAccionInsegura) return false;
+            
+            const idImplicado = reg[COLUMNA_ID_IMPLICADO] ? reg[COLUMNA_ID_IMPLICADO].toString().trim() : '';
+            const areaImplicado = reg[COLUMNA_AREA_IMPLICADO] ? reg[COLUMNA_AREA_IMPLICADO].toString().toLowerCase() : '';
+            
+            const coincideCodigo = idImplicado.includes(codigoEmpleado) || codigoEmpleado.includes(idImplicado);
+            const esSoftDrinks = areaImplicado.includes('softdrinks');
+            
+            return coincideCodigo && !esSoftDrinks;
+        });
+        
+        if (registrosComoObservador.length === 0 && accionesInsegurasComoImplicadoSoftDrinks.length === 0 && accionesInsegurasComoImplicadoNoSoftDrinks.length === 0) {
             return {
                 success: false,
                 mensaje: `❌ *No se encontraron registros* para el código *${codigoEmpleado}* en ${mes}/${anio}`
@@ -951,7 +956,7 @@ async function consultarGuardian(codigoEmpleado, mesSeleccionado, anioSelecciona
         }
         resultado += `\n\n`;
         
-        resultado += `⚠️ *Acciones Inseguras:* ${accionesInseguras}\n`;
+        resultado += `⚠️ *Acciones Inseguras (reportadas):* ${accionesInseguras}\n`;
         resultado += `   `;
         for (let i = 0; i < 20; i++) {
             if (i < accionesInseguras) resultado += `█`;
@@ -983,60 +988,41 @@ async function consultarGuardian(codigoEmpleado, mesSeleccionado, anioSelecciona
         resultado += `• Reportes Ambientales: ${reportesAmbientales}\n`;
         resultado += `• Total registros: ${registrosComoObservador.length}\n\n`;
         
-        if (accionesInsegurasSoftDrinks.length > 0) {
-            resultado += `⚠️ *ACCIONES INSEGURAS EN SOFTDRINKS (donde apareces como implicado u observador):*\n\n`;
+        // MOSTRAR SOLO ACCIONES INSEGURAS COMO IMPLICADO EN SOFTDRINKS
+        if (accionesInsegurasComoImplicadoSoftDrinks.length > 0) {
+            resultado += `⚠️ *ACCIONES INSEGURAS EN SOFTDRINKS DONDE HAS SIDO REPORTADO COMO IMPLICADO:*\n\n`;
             
-            accionesInsegurasSoftDrinks.forEach((reg, index) => {
+            accionesInsegurasComoImplicadoSoftDrinks.forEach((reg, index) => {
                 const descripcion = reg[COLUMNA_DESCRIPCION] || 'Sin descripción';
                 const area = reg[COLUMNA_AREA] || 'No especificada';
                 const subarea = reg[COLUMNA_SUBAREA] || 'No especificada';
                 const observadoPor = reg[COLUMNA_OBSERVADO_POR] || 'Desconocido';
                 const areaImplicado = reg[COLUMNA_AREA_IMPLICADO] || 'No especificada';
-                const areaObservador = reg[COLUMNA_AREA_OBSERVADOR] || 'No especificada';
                 const idImplicado = reg[COLUMNA_ID_IMPLICADO] || 'No especificado';
-                const idObservador = reg[COLUMNA_ID_OBSERVADOR] || 'No especificado';
                 
                 resultado += `⚠️ *ACCIÓN INSEGURA #${index + 1}*\n`;
                 resultado += `📝 *Descripción:* ${descripcion}\n`;
-                
-                if (idImplicado.includes(codigoEmpleado) || codigoEmpleado.includes(idImplicado)) {
-                    resultado += `👤 *Rol:* IMPLICADO\n`;
-                    resultado += `📍 *Área del implicado:* ${areaImplicado}\n`;
-                }
-                if (idObservador.includes(codigoEmpleado) || codigoEmpleado.includes(idObservador)) {
-                    resultado += `👤 *Rol:* OBSERVADOR\n`;
-                    resultado += `📍 *Área del observador:* ${areaObservador}\n`;
-                }
-                
+                resultado += `👤 *ROL:* IMPLICADO\n`;
+                resultado += `📍 *Área del implicado:* ${areaImplicado}\n`;
                 resultado += `📍 *Área de ocurrencia:* ${area}\n`;
                 resultado += `📍 *Subárea:* ${subarea}\n`;
                 resultado += `👤 *Reportado por:* ${observadoPor}\n`;
                 resultado += `─────────────────────\n\n`;
             });
             
-            resultado += `📊 *TOTAL DE ACCIONES INSEGURAS EN SOFTDRINKS:* ${accionesInsegurasSoftDrinks.length}\n\n`;
+            resultado += `📊 *TOTAL DE ACCIONES INSEGURAS COMO IMPLICADO EN SOFTDRINKS:* ${accionesInsegurasComoImplicadoSoftDrinks.length}\n\n`;
         }
         
-        if (accionesInsegurasComoImplicado.length > 0 && accionesInsegurasSoftDrinks.length === 0) {
-            resultado += `⚠️ *ACCIONES INSEGURAS DONDE HAS SIDO REPORTADO COMO IMPLICADO (fuera de SoftDrinks):*\n\n`;
-            
-            accionesInsegurasComoImplicado.forEach((reg, index) => {
-                const descripcion = reg[COLUMNA_DESCRIPCION] || 'Sin descripción';
-                const area = reg[COLUMNA_AREA] || 'No especificada';
-                const subarea = reg[COLUMNA_SUBAREA] || 'No especificada';
-                const observadoPor = reg[COLUMNA_OBSERVADO_POR] || 'Desconocido';
-                
-                resultado += `⚠️ *ACCIÓN INSEGURA #${index + 1}*\n`;
-                resultado += `📝 *Te han reportado por:* ${descripcion}\n`;
-                resultado += `📍 *Área de ocurrencia:* ${area}\n`;
-                resultado += `📍 *Subárea de ocurrencia:* ${subarea}\n`;
-                resultado += `👤 *Reportado por:* ${observadoPor}\n`;
-                resultado += `─────────────────────\n\n`;
-            });
-            
-            resultado += `📊 *TOTAL DE ACCIONES INSEGURAS COMO IMPLICADO:* ${accionesInsegurasComoImplicado.length}\n\n`;
-        } else if (accionesInsegurasComoImplicado.length === 0 && accionesInsegurasSoftDrinks.length === 0) {
-            resultado += `✅ *¡FELICIDADES!* No tienes acciones inseguras reportadas en este período.\n\n`;
+        // Mostrar acciones inseguras como implicado en otras áreas (solo el total)
+        if (accionesInsegurasComoImplicadoNoSoftDrinks.length > 0) {
+            resultado += `📊 *ACCIONES INSEGURAS COMO IMPLICADO EN OTRAS ÁREAS:* ${accionesInsegurasComoImplicadoNoSoftDrinks.length}\n`;
+            resultado += `(Estas acciones no aparecen detalladas por no ser del área SoftDrinks)\n\n`;
+        }
+        
+        if (accionesInsegurasComoImplicadoSoftDrinks.length === 0 && accionesInsegurasComoImplicadoNoSoftDrinks.length === 0) {
+            resultado += `✅ *¡FELICIDADES!* No tienes acciones inseguras reportadas como implicado en este período.\n\n`;
+        } else if (accionesInsegurasComoImplicadoSoftDrinks.length === 0 && accionesInsegurasComoImplicadoNoSoftDrinks.length > 0) {
+            resultado += `✅ *Nota:* Tienes acciones inseguras como implicado, pero ninguna en el área SoftDrinks.\n\n`;
         }
         
         resultado += `⏰ *Consulta:* ${moment().tz(TIMEZONE).format('DD/MM/YYYY HH:mm')}\n`;
@@ -1054,8 +1040,8 @@ async function consultarGuardian(codigoEmpleado, mesSeleccionado, anioSelecciona
                 incidentesMenores,
                 reportesAmbientales,
                 totalObservador: registrosComoObservador.length,
-                totalAccionesImplicado: accionesInsegurasComoImplicado.length,
-                totalAccionesSoftDrinks: accionesInsegurasSoftDrinks.length
+                totalAccionesImplicadoSoftDrinks: accionesInsegurasComoImplicadoSoftDrinks.length,
+                totalAccionesImplicadoOtras: accionesInsegurasComoImplicadoNoSoftDrinks.length
             }
         };
         
@@ -1098,9 +1084,9 @@ async function manejarGuardian(message, userId) {
         `• 1111\n` +
         `• 76009949\n\n` +
         `*📝 IMPORTANTE:*\n` +
-        `Puedes buscar con el código completo o cualquier parte que coincida.\n` +
-        `El sistema buscará tanto reportes que hayas hecho como acciones inseguras donde apareces como implicado, ` +
-        `con especial atención a las áreas de SoftDrinks (tanto como implicado u observador).\n\n` +
+        `El sistema te mostrará:\n` +
+        `• Los reportes que has hecho (como observador)\n` +
+        `• Las acciones inseguras donde has sido IMPLICADO en el área SOFTDRINKS\n\n` +
         `Envía tu código ahora o escribe *cancelar* para regresar al menú.`
     );
 }
@@ -4221,17 +4207,6 @@ process.on('SIGINT', async () => {
     await client.destroy();
     console.log('✅ Bot cerrado correctamente');
     process.exit(0);
-});
-// --- CONFIGURACIÓN DEL SERVIDOR WEB PARA RENDER ---
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-app.get('/', (req, res) => {
-    res.send('🤖 Bot Jarabito está activo y funcionando en Render!');
-});
-
-app.listen(PORT, () => {
-    console.log(`🌐 Servidor web iniciado en el puerto ${PORT}`);
 });
 
 iniciarBot().catch(error => {
