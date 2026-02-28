@@ -77,6 +77,7 @@ const client = new Client({
     }),
     puppeteer: {
         headless: "new",
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH, // <-- AGREGA ESTA LÍNEA AQUÍ
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
