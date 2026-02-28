@@ -744,7 +744,6 @@ async function manejarFormatoDescarga(message, userId, estadoUsuario) {
             "• El mes y año"
         );
         userStates.delete(userId);
-        await enviarMenu(message);
         return;
     }
     
@@ -781,7 +780,6 @@ async function manejarFormatoDescarga(message, userId, estadoUsuario) {
     }
     
     userStates.delete(userId);
-    await enviarMenu(message);
 }
 
 function base64ToArrayBuffer(base64) {
@@ -806,7 +804,7 @@ async function procesarExcelDesdeBase64(base64) {
     }
 }
 
-// FUNCIÓN PRINCIPAL DE GUARDIAN - SOLO MUESTRA ACCIONES INSEGURAS DONDE EL USUARIO ES IMPLICADO EN SOFTDRINKS
+// FUNCIÓN PRINCIPAL DE GUARDIAN - MODIFICADA CON LAS NUEVAS FUNCIONALIDADES
 async function consultarGuardian(codigoEmpleado, mesSeleccionado, anioSeleccionado) {
     try {
         console.log(`🔍 Consultando Guardian para código: ${codigoEmpleado}, mes: ${mesSeleccionado}, año: ${anioSeleccionado}`);
@@ -851,6 +849,7 @@ async function consultarGuardian(codigoEmpleado, mesSeleccionado, anioSelecciona
         const COLUMNA_AREA_IMPLICADO = 'Área del implicado';
         const COLUMNA_AREA_OBSERVADOR = 'Área del observador';
         const COLUMNA_PILAR_MEDIO_AMBIENTE = 'Pilar del medio ambiente';
+        const COLUMNA_REGLA_ORO = 'Regla de oro'; // Nueva columna para regla de oro
         
         // Registros donde el usuario es OBSERVADOR (reportes que él hizo)
         const registrosComoObservador = todosLosRegistros.filter(reg => {
@@ -1000,6 +999,11 @@ async function consultarGuardian(codigoEmpleado, mesSeleccionado, anioSelecciona
                 const areaImplicado = reg[COLUMNA_AREA_IMPLICADO] || 'No especificada';
                 const idImplicado = reg[COLUMNA_ID_IMPLICADO] || 'No especificado';
                 
+                // Verificar si es regla de oro
+                const reglaOro = reg[COLUMNA_REGLA_ORO] || '';
+                const esReglaOro = reglaOro.toString().toUpperCase().trim() === 'SI' || 
+                                  reglaOro.toString().toUpperCase().trim() === 'SÍ';
+                
                 resultado += `⚠️ *ACCIÓN INSEGURA #${index + 1}*\n`;
                 resultado += `📝 *Descripción:* ${descripcion}\n`;
                 resultado += `👤 *ROL:* IMPLICADO\n`;
@@ -1007,10 +1011,14 @@ async function consultarGuardian(codigoEmpleado, mesSeleccionado, anioSelecciona
                 resultado += `📍 *Área de ocurrencia:* ${area}\n`;
                 resultado += `📍 *Subárea:* ${subarea}\n`;
                 resultado += `👤 *Reportado por:* ${observadoPor}\n`;
+                resultado += `🔴 *Regla de oro:* ${esReglaOro ? 'SÍ' : 'NO'}\n`; // Nueva línea para regla de oro
                 resultado += `─────────────────────\n\n`;
             });
             
             resultado += `📊 *TOTAL DE ACCIONES INSEGURAS COMO IMPLICADO EN SOFTDRINKS:* ${accionesInsegurasComoImplicadoSoftDrinks.length}\n\n`;
+        } else {
+            // Mensaje de felicitaciones cuando NO hay acciones inseguras como implicado en SoftDrinks
+            resultado += `✅ *¡FELICIDADES!* No contás con acciones inseguras reportadas como implicado en SoftDrinks durante este período.\n\n`;
         }
         
         // Mostrar acciones inseguras como implicado en otras áreas (solo el total)
@@ -1086,7 +1094,8 @@ async function manejarGuardian(message, userId) {
         `*📝 IMPORTANTE:*\n` +
         `El sistema te mostrará:\n` +
         `• Los reportes que has hecho (como observador)\n` +
-        `• Las acciones inseguras donde has sido IMPLICADO en el área SOFTDRINKS\n\n` +
+        `• Las acciones inseguras donde has sido IMPLICADO en el área SOFTDRINKS\n` +
+        `• Indicará si cada acción insegura es una REGLA DE ORO\n\n` +
         `Envía tu código ahora o escribe *cancelar* para regresar al menú.`
     );
 }
@@ -1470,7 +1479,7 @@ async function obtenerResultadosGrupo(message, userId, grupo, añoSeleccionado, 
         
         await message.reply(resultado);
         
-        await message.reply(`¿Deseas consultar otro período para el mismo grupo?\n\n1️⃣ - Sí\n2️⃣ - No, volver al menú principal\n\nEnvía el número de la opción.`);
+        await message.reply(`¿Deseas consultar otro período para el mismo grupo?\n\n1️⃣ - Sí\n2️⃣ - No\n\nEnvía el número de la opción.`);
         
         userStates.set(userId, { 
             estado: 'checklist_consultar_otro_periodo_grupo',
@@ -1483,7 +1492,6 @@ async function obtenerResultadosGrupo(message, userId, grupo, añoSeleccionado, 
         await message.reply(`❌ *Error al consultar resultados*\n\nNo se pudo obtener la información del grupo ${grupo}.\n\nDetalles: ${error.message}\n\nIntenta nuevamente más tarde.`);
         
         userStates.delete(userId);
-        await enviarMenu(message);
     }
 }
 
@@ -1555,7 +1563,6 @@ async function obtenerMesesTecnico(message, userId, codigoTecnico, añoSeleccion
         await message.reply(`❌ *Error al buscar técnico*\n\nNo se pudo conectar con la base de datos.\n\nIntenta nuevamente más tarde.`);
         
         userStates.delete(userId);
-        await enviarMenu(message);
     }
 }
 
@@ -1661,7 +1668,7 @@ async function obtenerResultadosTecnico(message, userId, tecnicoInfo, añoSelecc
         
         await message.reply(resultado);
         
-        await message.reply(`¿Deseas consultar otro período para el mismo técnico?\n\n1️⃣ - Sí\n2️⃣ - No, volver al menú principal\n\nEnvía el número de la opción.`);
+        await message.reply(`¿Deseas consultar otro período para el mismo técnico?\n\n1️⃣ - Sí\n2️⃣ - No\n\nEnvía el número de la opción.`);
         
         userStates.set(userId, { 
             estado: 'checklist_consultar_otro_periodo_tecnico',
@@ -1678,7 +1685,6 @@ async function obtenerResultadosTecnico(message, userId, tecnicoInfo, añoSelecc
         await message.reply(`❌ *Error al consultar resultados*\n\nNo se pudo obtener la información del técnico.\n\nDetalles: ${error.message}\n\nIntenta nuevamente más tarde.`);
         
         userStates.delete(userId);
-        await enviarMenu(message);
     }
 }
 
@@ -3058,7 +3064,6 @@ async function manejarConfirmacionGrupos(message, userId, estadoUsuario) {
         if (grupos.length === 0) {
             await message.reply("❌ No hay grupos disponibles. El bot no está en ningún grupo.");
             userStates.delete(userId);
-            await enviarMenu(message);
             return;
         }
         
@@ -3161,7 +3166,6 @@ async function guardarProgramacion(message, userId, estadoUsuario) {
     );
     
     userStates.delete(userId);
-    await enviarMenu(message);
 }
 
 async function manejarOpcionExistente(message, userId, estadoUsuario) {
@@ -3197,8 +3201,7 @@ async function manejarOpcionExistente(message, userId, estadoUsuario) {
         
     } else if (texto === '4') {
         userStates.delete(userId);
-        await message.reply("❌ Operación cancelada. Regresando al menú principal.");
-        await enviarMenu(message);
+        await message.reply("❌ Operación cancelada.");
     } else {
         await message.reply("❌ Opción inválida. Por favor envía un número del 1 al 4.");
     }
@@ -3220,7 +3223,7 @@ async function manejarSeleccionEditar(message, userId, estadoUsuario) {
         "Por favor envía tus credenciales en el formato:\n" +
         "`usuario:contraseña`\n\n" +
         "Ejemplo: admin:admin123\n\n" +
-        "O envía *cancelar* para regresar al menú principal."
+        "O envía *cancelar* para regresar."
     );
     
     estadoUsuario.estado = 'esperando_credenciales_editar';
@@ -3245,7 +3248,7 @@ async function manejarSeleccionEliminar(message, userId, estadoUsuario) {
         "Por favor envía tus credenciales en el formato:\n" +
         "`usuario:contraseña`\n\n" +
         "Ejemplo: admin:admin123\n\n" +
-        "O envía *cancelar* para regresar al menú principal."
+        "O envía *cancelar* para regresar."
     );
     
     estadoUsuario.estado = 'esperando_credenciales_eliminar';
@@ -3280,7 +3283,6 @@ async function eliminarProgramacion(message, userId, estadoUsuario) {
     );
     
     userStates.delete(userId);
-    await enviarMenu(message);
 }
 
 async function manejarSkapILC(message, userId) {
@@ -3302,7 +3304,7 @@ async function manejarSkapILC(message, userId) {
         "*📝 IMPORTANTE:*\n" +
         "Puedes buscar con el código completo o cualquier parte que coincida.\n" +
         "El sistema busca en todos los campos posibles.\n\n" +
-        "O envía *cancelar* para regresar al menú."
+        "O envía *cancelar* para regresar."
     );
 }
 
@@ -3324,7 +3326,7 @@ async function manejarSkapOUTS(message, userId) {
         "*📝 IMPORTANTE:*\n" +
         "Puedes buscar con el código completo o cualquier parte que coincida.\n" +
         "El sistema busca en todos los campos posibles.\n\n" +
-        "O envía *cancelar* para regresar al menú."
+        "O envía *cancelar* para regresar."
     );
 }
 
@@ -3333,8 +3335,6 @@ async function manejarReclamosCalidad(message, userId) {
     
     const resultado = await consultarReclamosCalidad();
     await message.reply(resultado.mensaje);
-    
-    await enviarMenu(message);
 }
 
 async function enviarBienvenidaGrupo(chat) {
@@ -3369,8 +3369,7 @@ async function manejarEstadoUsuario(message, userId) {
     
     if (texto === 'cancelar') {
         userStates.delete(userId);
-        await message.reply("❌ Operación cancelada. Regresando al menú principal.");
-        await enviarMenu(message);
+        await message.reply("❌ Operación cancelada.");
         return;
     }
     
@@ -3476,7 +3475,6 @@ async function manejarEstadoUsuario(message, userId) {
         await message.reply(resultado.mensaje);
         
         userStates.delete(userId);
-        await enviarMenu(message);
         return;
     }
     
@@ -3536,9 +3534,8 @@ async function manejarEstadoUsuario(message, userId) {
             await obtenerAnosDisponibles(message, userId, 'grupo', estadoUsuario.datos.grupo);
         } else if (texto === '2') {
             userStates.delete(userId);
-            await enviarMenu(message);
         } else {
-            await message.reply("❌ Opción inválida. Por favor envía 1 para otro período o 2 para volver al menú.");
+            await message.reply("❌ Opción inválida. Por favor envía 1 para otro período o 2 para terminar.");
         }
         return;
     }
@@ -3586,9 +3583,8 @@ async function manejarEstadoUsuario(message, userId) {
             await obtenerAnosDisponibles(message, userId, 'tecnico', estadoUsuario.datos.codigo);
         } else if (texto === '2') {
             userStates.delete(userId);
-            await enviarMenu(message);
         } else {
-            await message.reply("❌ Opción inválida. Por favor envía 1 para otro período o 2 para volver al menú.");
+            await message.reply("❌ Opción inválida. Por favor envía 1 para otro período o 2 para terminar.");
         }
         return;
     }
@@ -3613,7 +3609,6 @@ async function manejarEstadoUsuario(message, userId) {
         }
         
         userStates.delete(userId);
-        await enviarMenu(message);
         return;
     }
     
@@ -3637,7 +3632,6 @@ async function manejarEstadoUsuario(message, userId) {
         }
         
         userStates.delete(userId);
-        await enviarMenu(message);
         return;
     }
     
@@ -3839,8 +3833,7 @@ async function manejarEstadoUsuario(message, userId) {
             await guardarProgramacion(message, userId, estadoUsuario);
         } else if (texto === '2' || texto === 'no') {
             userStates.delete(userId);
-            await message.reply("❌ Programación cancelada. Volviendo al menú principal.");
-            await enviarMenu(message);
+            await message.reply("❌ Programación cancelada.");
         } else {
             await message.reply("Por favor selecciona:\n1 - Sí, guardar\n2 - No, cancelar");
         }
@@ -3848,7 +3841,6 @@ async function manejarEstadoUsuario(message, userId) {
     }
     
     userStates.delete(userId);
-    await enviarMenu(message);
 }
 
 async function enviarMenu(message) {
@@ -3911,7 +3903,7 @@ async function manejarOpcionMenu(message, opcion) {
             "1️⃣ - *ILC*\n" +
             "2️⃣ - *OUTS*\n\n" +
             "Envía el número de la opción (1-2)\n" +
-            "O envía *cancelar* para regresar al menú principal."
+            "O envía *cancelar* para regresar."
         );
     }
 }
