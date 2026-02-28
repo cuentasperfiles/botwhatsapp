@@ -28,5 +28,8 @@ RUN npm install
 
 COPY . .
 
+# EXPOSICIÓN DEL PUERTO PARA RENDER (NUEVO)
+EXPOSE 3000
+
 # 4. Arrancar el bot
 CMD [ "npm", "start" ]
