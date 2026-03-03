@@ -804,7 +804,6 @@ async function procesarExcelDesdeBase64(base64) {
     }
 }
 
-// FUNCIÓN PRINCIPAL DE GUARDIAN - MODIFICADA CON LAS NUEVAS FUNCIONALIDADES
 async function consultarGuardian(codigoEmpleado, mesSeleccionado, anioSeleccionado) {
     try {
         console.log(`🔍 Consultando Guardian para código: ${codigoEmpleado}, mes: ${mesSeleccionado}, año: ${anioSeleccionado}`);
@@ -849,15 +848,13 @@ async function consultarGuardian(codigoEmpleado, mesSeleccionado, anioSelecciona
         const COLUMNA_AREA_IMPLICADO = 'Área del implicado';
         const COLUMNA_AREA_OBSERVADOR = 'Área del observador';
         const COLUMNA_PILAR_MEDIO_AMBIENTE = 'Pilar del medio ambiente';
-        const COLUMNA_REGLA_ORO = 'Regla de oro'; // Nueva columna para regla de oro
+        const COLUMNA_REGLA_ORO = 'Regla de oro';
         
-        // Registros donde el usuario es OBSERVADOR (reportes que él hizo)
         const registrosComoObservador = todosLosRegistros.filter(reg => {
             const idObservador = reg[COLUMNA_ID_OBSERVADOR] ? reg[COLUMNA_ID_OBSERVADOR].toString().trim() : '';
             return idObservador.includes(codigoEmpleado) || codigoEmpleado.includes(idObservador);
         });
         
-        // SOLO acciones inseguras donde el usuario es IMPLICADO y además está en Área del implicado de SoftDrinks
         const accionesInsegurasComoImplicadoSoftDrinks = todosLosRegistros.filter(reg => {
             const esAccionInsegura = reg.tipoReporte === 'accion_insegura';
             if (!esAccionInsegura) return false;
@@ -865,17 +862,12 @@ async function consultarGuardian(codigoEmpleado, mesSeleccionado, anioSelecciona
             const idImplicado = reg[COLUMNA_ID_IMPLICADO] ? reg[COLUMNA_ID_IMPLICADO].toString().trim() : '';
             const areaImplicado = reg[COLUMNA_AREA_IMPLICADO] ? reg[COLUMNA_AREA_IMPLICADO].toString().toLowerCase() : '';
             
-            // Verificar que el código coincida con el ID del implicado
             const coincideCodigo = idImplicado.includes(codigoEmpleado) || codigoEmpleado.includes(idImplicado);
-            
-            // Verificar que el área del implicado sea SoftDrinks
             const esSoftDrinks = areaImplicado.includes('softdrinks');
             
-            // Solo incluir si es implicado Y está en SoftDrinks
             return coincideCodigo && esSoftDrinks;
         });
         
-        // Acciones inseguras donde es implicado pero NO en SoftDrinks (para estadísticas generales)
         const accionesInsegurasComoImplicadoNoSoftDrinks = todosLosRegistros.filter(reg => {
             const esAccionInsegura = reg.tipoReporte === 'accion_insegura';
             if (!esAccionInsegura) return false;
@@ -979,7 +971,7 @@ async function consultarGuardian(codigoEmpleado, mesSeleccionado, anioSelecciona
         }
         resultado += `\n\n`;
         
-        resultado += `📊 *RESUMEN TOTAL (Como observador):*\n`;
+        resultado += `📊 *RESUMEN TOTAL:*\n`;
         resultado += `• Condiciones Inseguras: ${condicionesInseguras}\n`;
         resultado += `• Reconocimientos: ${reconocimientos}\n`;
         resultado += `• Acciones Inseguras: ${accionesInseguras}\n`;
@@ -987,7 +979,6 @@ async function consultarGuardian(codigoEmpleado, mesSeleccionado, anioSelecciona
         resultado += `• Reportes Ambientales: ${reportesAmbientales}\n`;
         resultado += `• Total registros: ${registrosComoObservador.length}\n\n`;
         
-        // MOSTRAR SOLO ACCIONES INSEGURAS COMO IMPLICADO EN SOFTDRINKS
         if (accionesInsegurasComoImplicadoSoftDrinks.length > 0) {
             resultado += `⚠️ *ACCIONES INSEGURAS EN SOFTDRINKS DONDE HAS SIDO REPORTADO COMO IMPLICADO:*\n\n`;
             
@@ -999,10 +990,12 @@ async function consultarGuardian(codigoEmpleado, mesSeleccionado, anioSelecciona
                 const areaImplicado = reg[COLUMNA_AREA_IMPLICADO] || 'No especificada';
                 const idImplicado = reg[COLUMNA_ID_IMPLICADO] || 'No especificado';
                 
-                // Verificar si es regla de oro
                 const reglaOro = reg[COLUMNA_REGLA_ORO] || '';
-                const esReglaOro = reglaOro.toString().toUpperCase().trim() === 'SI' || 
-                                  reglaOro.toString().toUpperCase().trim() === 'SÍ';
+                const esReglaOro = reglaOro.toString().toLowerCase().trim() === 'si' || 
+                                  reglaOro.toString().toLowerCase().trim() === 'sí' ||
+                                  reglaOro.toString().toLowerCase().trim() === 'true' ||
+                                  reglaOro.toString().toLowerCase().trim() === '1' ||
+                                  reglaOro.toString().toLowerCase().trim() === 'x';
                 
                 resultado += `⚠️ *ACCIÓN INSEGURA #${index + 1}*\n`;
                 resultado += `📝 *Descripción:* ${descripcion}\n`;
@@ -1011,26 +1004,19 @@ async function consultarGuardian(codigoEmpleado, mesSeleccionado, anioSelecciona
                 resultado += `📍 *Área de ocurrencia:* ${area}\n`;
                 resultado += `📍 *Subárea:* ${subarea}\n`;
                 resultado += `👤 *Reportado por:* ${observadoPor}\n`;
-                resultado += `🔴 *Regla de oro:* ${esReglaOro ? 'SÍ' : 'NO'}\n`; // Nueva línea para regla de oro
+                
+                if (esReglaOro) {
+                    resultado += `🔴 *Regla de oro:* SÍ 🔴\n`;
+                } else {
+                    resultado += `🟢 *Regla de oro:* NO 🟢\n`;
+                }
+                
                 resultado += `─────────────────────\n\n`;
             });
             
             resultado += `📊 *TOTAL DE ACCIONES INSEGURAS COMO IMPLICADO EN SOFTDRINKS:* ${accionesInsegurasComoImplicadoSoftDrinks.length}\n\n`;
         } else {
-            // Mensaje de felicitaciones cuando NO hay acciones inseguras como implicado en SoftDrinks
             resultado += `✅ *¡FELICIDADES!* No contás con acciones inseguras reportadas como implicado en SoftDrinks durante este período.\n\n`;
-        }
-        
-        // Mostrar acciones inseguras como implicado en otras áreas (solo el total)
-        if (accionesInsegurasComoImplicadoNoSoftDrinks.length > 0) {
-            resultado += `📊 *ACCIONES INSEGURAS COMO IMPLICADO EN OTRAS ÁREAS:* ${accionesInsegurasComoImplicadoNoSoftDrinks.length}\n`;
-            resultado += `(Estas acciones no aparecen detalladas por no ser del área SoftDrinks)\n\n`;
-        }
-        
-        if (accionesInsegurasComoImplicadoSoftDrinks.length === 0 && accionesInsegurasComoImplicadoNoSoftDrinks.length === 0) {
-            resultado += `✅ *¡FELICIDADES!* No tienes acciones inseguras reportadas como implicado en este período.\n\n`;
-        } else if (accionesInsegurasComoImplicadoSoftDrinks.length === 0 && accionesInsegurasComoImplicadoNoSoftDrinks.length > 0) {
-            resultado += `✅ *Nota:* Tienes acciones inseguras como implicado, pero ninguna en el área SoftDrinks.\n\n`;
         }
         
         resultado += `⏰ *Consulta:* ${moment().tz(TIMEZONE).format('DD/MM/YYYY HH:mm')}\n`;
@@ -1090,12 +1076,12 @@ async function manejarGuardian(message, userId) {
         `*Ejemplos:*\n` +
         `• 76001111\n` +
         `• 1111\n` +
-        `• 76009949\n\n` +
+        `• 76001111\n\n` +
         `*📝 IMPORTANTE:*\n` +
         `El sistema te mostrará:\n` +
-        `• Los reportes que has hecho (como observador)\n` +
-        `• Las acciones inseguras donde has sido IMPLICADO en el área SOFTDRINKS\n` +
-        `• Indicará si cada acción insegura es una REGLA DE ORO\n\n` +
+        `• Los reportes que has hecho\n` +
+        `• Las acciones inseguras donde has sido IMPLICADO\n` +
+        `• Indicará si cada acción insegura es una REGLA DE ORO (🔴 SÍ / 🟢 NO)\n\n` +
         `Envía tu código ahora o escribe *cancelar* para regresar al menú.`
     );
 }
@@ -1992,8 +1978,8 @@ async function buscarSkapILC(codigoEmpleado) {
                    `El código *${codigoBusqueda}* no fue encontrado en la base de datos ILC.\n\n` +
                    `🔍 *Sugerencias:*\n` +
                    `• Verifica que el código sea correcto\n` +
-                   `• Intenta con el código completo (ej: 76009949)\n` +
-                   `• Intenta con solo los últimos dígitos (ej: 9949)\n` +
+                   `• Intenta con el código completo (ej: 76001111)\n` +
+                   `• Intenta con solo los últimos dígitos (ej: 1111)\n` +
                    `• Revisa directamente: https://skapjarabe.web.app/usuario.html\n\n` +
                    `📞 *Para más información:*\n` +
                    `Contacta al supervisor del área`;
@@ -2026,7 +2012,7 @@ async function buscarSkapILC(codigoEmpleado) {
                 timeout: 10000
             });
             preguntas = preguntasResponse.data || {};
-            console.log(`📝 Preguntas encontradas: ${Object.keys(preguntas).length}`);
+            console.log(`📝 Evaluaciones encontradas: ${Object.keys(preguntas).length}`);
         } catch (error) {
             console.log("No se pudieron obtener preguntas:", error.message);
         }
@@ -2367,7 +2353,7 @@ async function buscarSkapOUTS(codigoEmpleado) {
                 timeout: 10000
             });
             preguntas = preguntasResponse.data || {};
-            console.log(`📝 Preguntas encontradas: ${Object.keys(preguntas).length}`);
+            console.log(`📝 Evaluacionesencontradas: ${Object.keys(preguntas).length}`);
         } catch (error) {
             console.log("No se pudieron obtener preguntas:", error.message);
         }
@@ -3341,7 +3327,7 @@ async function enviarBienvenidaGrupo(chat) {
     try {
         const mensajeBienvenida = 
             `👋 *¡Hola a todos!*\n\n` +
-            `Mi nombre es *Jarabito* 🤖, tu asistente de seguridad e información de *Jarabe*\n\n` +
+            `Mi nombre es *Jarabito Bot* 🤖, tu asistente de seguridad e información de *Jarabe*\n\n` +
             `*¿Cómo puedo ayudarte?*\n\n` +
             `Para interactuar conmigo, simplemente escribe el comando:\n` +
             `*/menu* o */menú*\n\n` +
@@ -3349,8 +3335,8 @@ async function enviarBienvenidaGrupo(chat) {
             `• Consultar semáforo de territorios 🚦\n` +
             `• Consultar información SKAP 📋\n` +
             `• Acceder a checklists de seguridad ✅\n` +
-            `• Consultar reclamos de calidad 📊\n` +
-            `• Consultar CIP Jarabe Terminado 🧪\n` +
+            `• Consultar reclamos de calidad 📋\n` +
+            `• Consultar CIP Jarabe Terminado 🌡️\n` +
             `• Y mucho más...\n\n` +
             `*⚠️ IMPORTANTE:*\n` +
             `Solo responderé cuando uses el comando */menu* o */menú* primero.\n\n` +
@@ -3847,18 +3833,18 @@ async function enviarMenu(message) {
     const saludo = obtenerSaludo();
     
     const menu = 
-        `*Hola ${saludo}!* 🌞\n` +
-        `Mi nombre es *Jarabito* 🤖, tu asistente de seguridad e información de Jarabe.\n` +
+        `*Hola ${saludo}!* \n` +
+        `Mi nombre es *Jarabito Bot* 🤖, tu asistente de seguridad e información de Jarabe.\n` +
         `¿En qué te puedo ayudar hoy?\n\n` +
         `*Selecciona una opción:*\n\n` +
-        `1️⃣ - *Acadia* 📊\n` +
+        `1️⃣ - *Acadia* 📚\n` +
         `2️⃣ - *Guardian* 🛡️\n` +
         `3️⃣ - *Checklist de seguridad* ✅\n` +
         `4️⃣ - *Semáforo de territorio* 🚦\n` +
         `5️⃣ - *Reclamos de calidad* 📋\n` +
         `6️⃣ - *Energía* ⚡\n` +
-        `7️⃣ - *CIP Jarabe terminado* 🧪\n` +
-        `8️⃣ - *CIP Jarabe simple*\n` +
+        `7️⃣ - *CIP Jarabe terminado* 🌡️\n` +
+        `8️⃣ - *CIP Jarabe simple* 🌡️\n` +
         `9️⃣ - *Programar mensajes* ⏰\n` +
         `🔟 - *SKAP* 📋\n\n` +
         `*Envía el número de la opción (1-10)*`;
